@@ -1,9 +1,7 @@
-# About
+# Tauri + Yew
 
-## Documentation
+This template should help get you started developing with Tauri and Yew.
 
-Gstreamer:
+## Recommended IDE Setup
 
-- [Binding docs](https://gstreamer.pages.freedesktop.org/gstreamer-rs/stable/latest/docs/gstreamer/)
-- [Binding examples](https://gitlab.freedesktop.org/gstreamer/gstreamer-rs/-/tree/main/tutorials/src/bin)
-- [Examples](https://gstreamer.freedesktop.org/documentation/tutorials/index.html?gi-language=c)
+[VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).

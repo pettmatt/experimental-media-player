@@ -7,7 +7,7 @@ use anyhow::Error;
 use gst::prelude::*;
 
 #[allow(unused_imports)]
-#[path = "../common.rs"]
+#[path = "./common.rs"]
 mod common;
 
 fn main_loop(uri: &str) -> Result<(), Error> {
