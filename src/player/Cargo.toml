@@ -8,3 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.86"
 gstreamer = "0.23.1"
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
