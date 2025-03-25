@@ -19,4 +19,4 @@ gstreamer = "0.23.1"
 
 [workspace]
 members = ["src-tauri"]
-exclude = ["src/player"]
+exclude = ["src/player", "src/player-examples"]
