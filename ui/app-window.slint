@@ -1,0 +1,33 @@
+import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { SideBar } from "side-bar.slint";
+import { MainList } from "main-list.slint";
+import { MediaElement } from "media-element.slint";
+
+export component AppWindow inherits Window {
+	preferred-width: 400px;
+    preferred-height: 500px;
+
+    left-bar := VerticalBox {
+		width: 200px;
+
+		Text { text: "Left"; }
+	}
+
+	middle-section := VerticalBox {
+		width: 400px;
+
+		Text { text: "Middle"; }
+	}
+
+	right-bar := VerticalBox {
+		width: 100px;
+
+		Text { text: "Right"; }
+	}
+
+	bottom-bar := HorizontalBox {
+		height: 50px;
+
+		Text { text: "Bottom"; }
+	}
+}

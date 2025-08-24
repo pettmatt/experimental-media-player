@@ -1,16 +1,38 @@
-# Tauri + Vue + TypeScript
+# Slint Rust Template
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+A template for a Rust application that's using [Slint](https://slint.rs/) for the user interface.
 
-## Recommended IDE Setup
+## About
 
-- [VS Code](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+This template helps you get started developing a Rust application with Slint as toolkit
+for the user interface. It demonstrates the integration between the `.slint` UI markup and
+Rust code, how to react to callbacks, get and set properties, and use basic widgets.
 
-## Type Support For `.vue` Imports in TS
+## Usage
 
-Since TypeScript cannot handle type information for `.vue` imports, they are shimmed to be a generic Vue component type by default. In most cases this is fine if you don't really care about component prop types outside of templates. However, if you wish to get actual prop types in `.vue` imports (for example to get props validation when using manual `h(...)` calls), you can enable Volar's Take Over mode by following these steps:
+1. Install Rust by following its [getting-started guide](https://www.rust-lang.org/learn/get-started).
+   Once this is done, you should have the `rustc` compiler and the `cargo` build system installed in your `PATH`.
+2. Download and extract the [ZIP archive of this repository](https://github.com/slint-ui/slint-rust-template/archive/refs/heads/main.zip).
+3. Rename the extracted directory and change into it:
+    ```
+    mv slint-rust-template-main my-project
+    cd my-project    
+    ```
+4. Build with `cargo`:
+    ```
+    cargo build
+    ```
+5. Run the application binary:
+    ```
+    cargo run
+    ```
 
-1. Run `Extensions: Show Built-in Extensions` from VS Code's command palette, look for `TypeScript and JavaScript Language Features`, then right click and select `Disable (Workspace)`. By default, Take Over mode will enable itself if the default TypeScript extension is disabled.
-2. Reload the VS Code window by running `Developer: Reload Window` from the command palette.
+We recommend using an IDE for development, along with our [LSP-based IDE integration for `.slint` files](https://github.com/slint-ui/slint/blob/master/tools/lsp/README.md). You can also load this project directly in [Visual Studio Code](https://code.visualstudio.com) and install our [Slint extension](https://marketplace.visualstudio.com/items?itemName=Slint.slint).
 
-You can learn more about Take Over mode [here](https://github.com/johnsoncodehk/volar/discussions/471).
+## Next Steps
+
+We hope that this template helps you get started, and that you enjoy exploring making user interfaces with Slint. To learn more
+about the Slint APIs and the `.slint` markup language, check out our [online documentation](https://slint.dev/docs).
+
+Don't forget to edit this readme to replace it by yours, and edit the `name =` field in `Cargo.toml` to match the name of your
+project.
