@@ -1,0 +1,35 @@
+import { HorizontalBox, VerticalBox, Button } from "std-widgets.slint";
+
+export component Settings {
+	in property<[string]> source_paths: [];
+	callback request_new_source_path(source_path: string);
+
+	VerticalBox {
+		HorizontalBox {
+			Text { text: "Source directories"; }
+			dir_input := TextInput {
+				text: "Directory path";
+				input-type: text;
+			}
+			Button {
+				text: "Find dir";
+				clicked => {
+					// Open file explorer
+				}
+			}
+			Button {
+				text: "Add";
+				clicked => {
+					root.request_new_source_path(dir_input.text);
+					dir_input.text = "";
+				}
+			}
+		}
+		HorizontalBox {
+			for path in root.source_paths:
+				Rectangle {
+					Text { text: path; }
+				}
+		}
+	}
+}
