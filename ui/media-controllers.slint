@@ -1,0 +1,26 @@
+import { HorizontalBox, VerticalBox, Button } from "std-widgets.slint";
+
+export component MediaControllers {
+	in property<{
+		time: {
+			current: string,
+			length: string
+		}
+	}> playing;
+
+	VerticalBox {
+		HorizontalBox {
+			Button { text: "mix"; }
+			Button { text: "prev"; }
+			Button { text: "start"; }
+			Button { text: "next"; }
+			Button { text: "loop"; }
+		}
+
+		HorizontalBox {
+			Text { text: root.playing.time.current; }
+			Rectangle { background: orange; }
+			Text { text: root.playing.time.length; }
+		}
+	}
+}
