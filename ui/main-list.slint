@@ -1,4 +1,44 @@
-export component MainList {
+import { HorizontalBox } from "std-widgets.slint";
+import { CustomButton } from "custom-elements/custom-button.slint";
 
-	Text { text: "Main list"; }
+component Item {
+	in property<{
+		id: string,
+		name: string,
+		author: string,
+		source: string,
+		image_url: string,
+		audio: {
+			id: string,
+			added: string,
+		},
+	}> data;
+
+	CustomButton {
+		HorizontalBox {
+			Image {}
+			Text { text: root.data.name; }
+			Text { text: root.data.author; }
+			Text { text: root.data.source; }
+		}
+	}
+}
+
+export component MainList {
+	in property<[{
+		id: string,
+		name: string,
+		author: string,
+		source: string,
+		image_url: string,
+		audio: {
+			id: string,
+			added: string,
+		},
+	}]> list;
+
+	for item in list:
+		Item {
+			data: item;
+		}
 }
