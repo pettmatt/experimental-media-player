@@ -1,4 +1,62 @@
-export component SideBar {
+import { CustomButton } from "custom-elements/custom-button.slint";
+import { HorizontalBox, VerticalBox } from "std-widgets.slint";
 
-	Text { text: "Side bar"; }
+component Playlist {
+	in property <{
+		id: string,
+		name: string,
+		source: [string],
+		image_url: string,
+		created_at: string,
+		last_time_listened: string,
+		audio_list: [{
+			id: string,
+			added: string,
+		}],
+	}> data;
+
+	CustomButton {
+		HorizontalBox {
+			Image {
+				// source: @image-url(root.data.image_url);
+				height: 100%;
+			}
+
+			VerticalBox {
+				Text {
+					text: data.name;
+				}
+
+				Text {
+					text: "Source: " +
+						data.source.length > 1
+							? "mixed (" + data.source.length + ")"
+							: data.source[0];
+				}
+			}
+		}
+	}
+}
+
+export component SideBar {
+	in property <[{
+		id: string,
+		name: string,
+		source: [string],
+		image_url: string,
+		created_at: string,
+		last_time_listened: string,
+		audio_list: [{
+			id: string,
+			added: string,
+		}],
+	}]> playlists;
+
+	VerticalBox {
+		for data in root.playlists:
+			Playlist {
+				data: data;
+				height: 30px;
+			}
+	}
 }
