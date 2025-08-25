@@ -1,33 +1,46 @@
 import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
 import { SideBar } from "side-bar.slint";
 import { MainList } from "main-list.slint";
-import { MediaElement } from "media-element.slint";
+import { MediaControllers } from "media-controllers.slint";
+import { Queue } from "queue.slint";
+
+global Palette {
+	in-out property<color> primary-text: #000;
+	in-out property<color> primary-background: #dddddd;
+}
 
 export component AppWindow inherits Window {
-	preferred-width: 400px;
-    preferred-height: 500px;
+	preferred-width: 100%;
+    preferred-height: 100%;
 
-    left-bar := VerticalBox {
-		width: 200px;
+	property<physical-length> gl-margin: 5px;
+	property<physical-length> gl-padding: 5px;
 
-		Text { text: "Left"; }
+    main-view := HorizontalBox {
+		x: 0px;
+		y: 0px;
+		width: 100%;
+
+		if root.width > 500px:
+			SideBar { playlists: []; y: 0; }
+
+		MainList { list: []; min-width: root.width * 60%; }
+
+		if root.width > 700px:
+			Queue { y: 0; }
 	}
 
-	middle-section := VerticalBox {
-		width: 400px;
+	vertical-view := VerticalBox {
+		x: 0px;
+		y: parent.height - self.height;
+		height: 150px;
 
-		Text { text: "Middle"; }
-	}
+		if root.width < 500px:
+			SideBar { }
 
-	right-bar := VerticalBox {
-		width: 100px;
+		if root.width < 700px:
+			Queue { }
 
-		Text { text: "Right"; }
-	}
-
-	bottom-bar := HorizontalBox {
-		height: 50px;
-
-		Text { text: "Bottom"; }
+		MediaControllers { }
 	}
 }
