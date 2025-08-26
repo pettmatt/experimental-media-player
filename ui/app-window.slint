@@ -5,8 +5,8 @@ import { MediaControllers } from "media-controllers.slint";
 import { Queue } from "queue.slint";
 
 global Palette {
-	in-out property<color> primary-text: #000;
-	in-out property<color> primary-background: #dddddd;
+	in-out property<color> primary-text: #191b20;
+	in-out property<color> primary-background: #808597;
 }
 
 export component AppWindow inherits Window {
@@ -15,6 +15,13 @@ export component AppWindow inherits Window {
 
 	property<physical-length> gl-margin: 5px;
 	property<physical-length> gl-padding: 5px;
+
+	callback media_mix();
+	callback media_change(int);
+	callback media_start(bool);
+	callback media_loop(bool);
+
+	callback new_local_source();
 
     main-view := HorizontalBox {
 		x: 0px;
@@ -35,12 +42,19 @@ export component AppWindow inherits Window {
 		y: parent.height - self.height;
 		height: 150px;
 
+		Button {
+			text: "test";
+			clicked => { root.new_local_source() }
+		}
+
 		if root.width < 500px:
 			SideBar { }
 
 		if root.width < 700px:
 			Queue { }
 
-		MediaControllers { }
+		MediaControllers {
+			
+		}
 	}
 }

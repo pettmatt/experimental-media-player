@@ -8,13 +8,18 @@ export component MediaControllers {
 		}
 	}> playing;
 
+	callback mix_audio();
+	callback start(bool);
+	callback loop_audio(bool);
+	callback change_audio(int);
+
 	VerticalBox {
 		HorizontalBox {
-			Button { text: "mix"; }
-			Button { text: "prev"; }
-			Button { text: "start"; }
-			Button { text: "next"; }
-			Button { text: "loop"; }
+			Button { text: "mix"; clicked => { mix_audio() } }
+			Button { text: "prev"; clicked => { change_audio(-1) } }
+			Button { text: "start"; clicked => { start(true) } }
+			Button { text: "next"; clicked => { change_audio(1) } }
+			Button { text: "loop"; clicked => { loop_audio(true) } }
 		}
 
 		HorizontalBox {
