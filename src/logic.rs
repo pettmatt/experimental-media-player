@@ -1,6 +1,5 @@
 pub mod ui {
-    use std::collections::HashMap;
-    use crate::{logic::managment::source::{read_source, read_sources}, AppWindow};
+    use crate::{logic::managment::source::read_source, AppWindow};
 
     use super::managment::source;
 
@@ -9,7 +8,7 @@ pub mod ui {
 		app.on_media_change(move |index: i32| audio_control_events::handle_media_change(index));
 		app.on_media_start(move |start: bool| audio_control_events::handle_media_start(start));
 		app.on_media_loop(move |create_loop: bool| audio_control_events::handle_media_loop(create_loop));
-		app.on_media_mix(move || audio_control_events::handle_media_mix());
+		app.on_media_mix(audio_control_events::handle_media_mix);
 
 		// Settings
 		app.on_new_local_source(move || {
@@ -55,6 +54,12 @@ pub mod managment {
 			path: String,
 			extension: String,
 			file_size: u64,
+		}
+
+		impl std::fmt::Display for MediaFile {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				write!(f, "({}, {}, {}, '{}', {})", self.name, self.author, self.path, self.extension, self.file_size)
+			}
 		}
 
 		pub fn new_local_source() -> Option<PathBuf> {
@@ -132,7 +137,90 @@ pub mod managment {
 
 	}
 
-	mod database {
+	pub mod database {
+    	use std::{borrow::Cow, collections::HashMap, io::Error, path::Path};
+    	use sqlite::Connection;
+    	use super::source::MediaFile;
 
+		fn connect() -> Result<Connection, Error> {
+			let db_path = "./database/main.db";
+			let path = Path::new(db_path);
+			let result = sqlite::open(path);
+
+			match result {
+				Ok(connect) => Ok(connect),
+				Err(_) => {
+					println!("Unable to open the database file. Trying to solve the problem by creating it.");
+					match std::fs::File::create(db_path) {
+						Ok(file) => {
+							println!("Created sqlite db file: {:?}", file);
+							self::connect()
+						},
+						Err(message) => Err(message)
+					}
+				}
+			}
+		}
+
+		pub fn initialize_table(table_name: Cow<'_, str>) -> Result<Cow<'_, str>, ()> {
+			if let Ok(connection) = connect() {
+				let query = format!("
+					CREATE TABLE {} (
+						name TEXT NOT NULL,
+						author TEXT NOT NULL,
+						path TEXT NOT NULL,
+						extension TEXT NOT NULL,
+						file_size INTEGER,
+						source TEXT
+					);
+					CREATE INDEX name_index ON main(name);
+					CREATE INDEX author_index ON main(author);
+					CREATE INDEX source_index ON main(source);
+				", table_name.clone().as_ref());
+
+				connection.execute(query).unwrap();
+				return Ok(table_name);
+			}
+
+			Err(())
+		}
+
+		pub fn get_table(table_name: Cow<'_, str>) {
+			if let Ok(connection) = connect() {
+				let query = format!("SELECT * FROM {}", table_name.as_ref());
+
+				let result = connection
+					.iterate(query, |pairs| {
+						for &(key, value) in pairs.iter() {
+							println!("{} = {}", key, value.unwrap());
+						}
+
+						true
+					});
+
+				println!("get_index result {:?}", result);
+			}
+		}
+
+		pub fn add_records(table_name: Cow<'_, str>, new_records: Vec<MediaFile>) {
+			if let Ok(connection) = connect() {
+				let mut result: HashMap<usize, bool> = HashMap::new();
+
+				for record in new_records {
+					let query = format!(
+						"INSERT INTO {} (name, author, path, extension, file_size, source) VALUES {}",
+						table_name.clone().into_owned(),
+						record
+					);
+
+					let key = result.len();
+					result.insert(key, true);
+
+					if connection.execute(query).is_err() {
+						result.entry(key).and_modify(|value| *value = false);
+					};
+				}
+			}
+		}
 	}
 }
