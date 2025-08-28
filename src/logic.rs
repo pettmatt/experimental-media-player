@@ -138,26 +138,45 @@ pub mod managment {
 	}
 
 	pub mod database {
-    	use std::{borrow::Cow, collections::HashMap, io::Error, path::Path};
-    	use sqlite::Connection;
+    	use std::{borrow::Cow, collections::HashMap, path::Path};
+		use thiserror::Error;
     	use super::source::MediaFile;
 
-		fn connect() -> Result<Connection, Error> {
-			let db_path = "./database/main.db";
-			let path = Path::new(db_path);
-			let result = sqlite::open(path);
+		#[derive(Error, Debug)]
+		pub enum CError {
+			#[error("SQLite error: {0}")]
+			Sqlite(#[from] sqlite::Error),
+			#[error("IO error: {0}")]
+			Io(#[from] std::io::Error),
+		}
+
+		fn connect() -> Result<sqlite::Connection, CError> {
+			let db_path = String::from("./database/main.db");
+			let result = sqlite::open(&db_path);
 
 			match result {
 				Ok(connect) => Ok(connect),
-				Err(_) => {
-					println!("Unable to open the database file. Trying to solve the problem by creating it.");
-					match std::fs::File::create(db_path) {
-						Ok(file) => {
-							println!("Created sqlite db file: {:?}", file);
-							self::connect()
-						},
-						Err(message) => Err(message)
+				Err(error) => {
+					println!("Error occured: {}", error);
+					println!("Trying to solve the problem by creating it.");
+
+					if error.code == Some(14) {
+						let mut builder = std::fs::DirBuilder::new();
+						builder.recursive(true).create("./database")?;
+
+						match std::fs::File::create(db_path) {
+							Ok(file) => {
+								println!("Created sqlite db file: {:?}", file);
+								return self::connect();
+							},
+							Err(message) => {
+								println!("Error occured: {}", message);
+								return Err(CError::Io(message));
+							}
+						}
 					}
+
+					Err(CError::Sqlite(error))
 				}
 			}
 		}
@@ -165,13 +184,15 @@ pub mod managment {
 		pub fn initialize_table(table_name: Cow<'_, str>) -> Result<Cow<'_, str>, ()> {
 			if let Ok(connection) = connect() {
 				let query = format!("
-					CREATE TABLE {} (
-						name TEXT NOT NULL,
-						author TEXT NOT NULL,
-						path TEXT NOT NULL,
+					PAGMA foreign_keys = ON;
+					CREATE TABLE IF NOT EXISTS {} (
+						name 	TEXT NOT NULL,
+						author 	TEXT NOT NULL,
+						path 	TEXT NOT NULL,
 						extension TEXT NOT NULL,
 						file_size INTEGER,
-						source TEXT
+						source 	TEXT
+						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
 					);
 					CREATE INDEX name_index ON main(name);
 					CREATE INDEX author_index ON main(author);
@@ -214,11 +235,13 @@ pub mod managment {
 					);
 
 					let key = result.len();
-					result.insert(key, true);
-
+					let mut value = true;
+					
 					if connection.execute(query).is_err() {
-						result.entry(key).and_modify(|value| *value = false);
+						value = false;
 					};
+
+					result.insert(key, value);
 				}
 			}
 		}

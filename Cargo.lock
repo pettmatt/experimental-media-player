@@ -4003,6 +4003,7 @@ dependencies = [
  "slint",
  "slint-build",
  "sqlite",
+ "thiserror 2.0.16",
 ]
 
 [[package]]
