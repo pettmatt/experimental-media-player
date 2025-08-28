@@ -1,7 +1,8 @@
 pub mod ui {
-    use crate::{logic::managment::source::read_source, AppWindow};
+    use std::borrow::Cow;
 
-    use super::managment::source;
+    use crate::{logic::managment::{database, source::{read_source, Source}}, AppWindow};
+    use super::managment::source::new_local_source;
 
 	pub fn handle_events(app: &AppWindow) {
 		// Media elements bottom panel.
@@ -12,10 +13,18 @@ pub mod ui {
 
 		// Settings
 		app.on_new_local_source(move || {
-			let source = source::new_local_source();
+			let source = new_local_source();
 
 			match source {
 				Some(source) => {
+					{
+						let path_string = source.clone().to_str().unwrap().to_string();
+						database::add_record(Cow::from("sources"), Source {
+							origin: String::from("local"),
+							path: path_string
+						});
+					}
+
 					println!("Directory fetched correctly {:?}", source);
 					let files = read_source(source).expect("Couldn't fetch all files");
 					println!("files read correctly {:?}", files);
@@ -44,21 +53,34 @@ pub mod ui {
 
 pub mod managment {
 	pub mod source {
-		use std::{fmt::Error, fs, path::{Path, PathBuf}};
+		use std::{borrow::Cow, collections::HashMap, fmt::Error, fs, path::{Path, PathBuf}};
 		use native_dialog::DialogBuilder;
+		use super::database;
 
 		#[derive(Debug)]
 		pub struct MediaFile {
-			name: String,
-			author: String,
-			path: String,
-			extension: String,
-			file_size: u64,
+			pub name: String,
+			pub author: String,
+			pub path: String,
+			pub extension: String,
+			pub file_size: u64,
+		}
+
+		#[derive(Debug)]
+		pub struct Source {
+			pub origin: String,
+			pub path: String,
 		}
 
 		impl std::fmt::Display for MediaFile {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				write!(f, "({}, {}, {}, '{}', {})", self.name, self.author, self.path, self.extension, self.file_size)
+				write!(f, "({}, {}, {}, {}, {})", self.name, self.author, self.path, self.extension, self.file_size)
+			}
+		}
+
+		impl std::fmt::Display for Source {
+			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+				write!(f, "({}, {})", self.origin, self.path)
 			}
 		}
 
@@ -68,20 +90,15 @@ pub mod managment {
 				.open_single_dir()
 				.show()
 				.unwrap();
-			
-			// let path: PathBuf = match path {
-			// 	Some(path) => path,
-			// 	None => return None,
-			// };
 
 			path
 		}
 
-		pub fn read_source(source: PathBuf) -> Result<Vec<MediaFile>, Error> {
-			let mut files: Vec<MediaFile> = Vec::new();
+		pub fn read_source(source: PathBuf) -> Result<HashMap<String, MediaFile>, Error> {
+			let mut hashmap: HashMap<String, MediaFile> = HashMap::new();
 			let path = source.as_path();
 
-			let entries = fs::read_dir(&path).expect("Couldn't read directory from path");
+			let entries = fs::read_dir(path).expect("Couldn't read directory from path");
 
 			for entry in entries {
 				let entry = entry.expect("Couldn't get entry");
@@ -91,7 +108,7 @@ pub mod managment {
 					let nested_files = read_source(entry_path.clone());
 
 					if let Ok(nf) = nested_files {
-						files.extend(nf)
+						hashmap.extend(nf)
 					}
 				} else {
 					let file_name = entry.file_name().to_string_lossy().to_string();
@@ -112,23 +129,44 @@ pub mod managment {
 					};
 
 					if mime_type != None {
-						files.push(
-							MediaFile {
-								name: file_name,
-								author: String::from("None"),
-								extension: String::from(file_extension),
-								path: String::from(""),
-								file_size,
-							}
-						)
+						let author = String::from("None");
+						let key = format!("{}.{}", file_name, author);
+
+						hashmap.entry(key).or_insert(MediaFile {
+							author,
+							name: file_name,
+							extension: String::from(file_extension),
+							path: String::from(""),
+							file_size,
+						});
 					}
 				}
 			}
 
-			Ok(files)
+			Ok(hashmap)
 		}
 
 		pub fn read_sources() {}
+
+		pub fn get_local_files() -> HashMap<String, MediaFile> {
+			// Fetch sources.
+			let source = database::get_table(Cow::from("sources"));
+			let mut hashmap: HashMap<String, MediaFile> = HashMap::new();
+
+			match source {
+				Some(source) => {
+					println!("Directory fetched correctly {:?}", source);
+					// Add new source to sources.
+					// Read through the source on new source added.
+					// Check if there is neat way to do this, or do I need to manually call the function here.
+					// let files = read_source(source).expect("Couldn't fetch all files");
+					hashmap = read_source(source).expect("Couldn't fetch all files");
+				},
+				None => println!("Didn't receive a path. Result should be None: {:?}", source)
+			}
+
+			hashmap
+		}
 
 		fn update_index() {}
 	}
@@ -138,9 +176,51 @@ pub mod managment {
 	}
 
 	pub mod database {
-    	use std::{borrow::Cow, collections::HashMap, path::Path};
+    	use std::{borrow::Cow, collections::HashMap, fmt::Error, io::Error, path::Path, sync::Arc};
+		use sqlite::{Row, State};
 		use thiserror::Error;
-    	use super::source::MediaFile;
+    	use super::source::{MediaFile, Source};
+
+		pub trait FromRow {
+			fn from_row(row: Row) -> Result<Self, Box<dyn std::error::Error>> where Self: Sized;
+		}
+
+		impl FromRow for MediaFile {
+			fn from_row(row: Row) -> Result<Self, Box<dyn std::error::Error>> {
+				Ok(MediaFile {
+					name: row.read(0)?,
+					author: row.read(1)?,
+					extension: row.read(2)?,
+					path: row.read(3)?,
+					file_size: row.read(4)?,
+				})
+			}
+		}
+
+		impl FromRow for Source {
+			fn from_row(row: Row) -> Result<Self, Box<dyn std::error::Error>> {
+				Ok(Source {
+					origin: row.read(0)?,
+					path: row.read(1)?,
+				})
+			}
+		}
+
+		pub trait CreateKey {
+			fn create_key(&self) -> String;
+		}
+
+		impl CreateKey for MediaFile {
+			fn create_key(&self) -> String {
+				format!("{}.{}", self.author, self.name)
+			}
+		}
+
+		impl CreateKey for Source {
+			fn create_key(&self) -> String {
+				format!("{}", self.path)
+			}
+		}
 
 		#[derive(Error, Debug)]
 		pub enum CError {
@@ -181,54 +261,90 @@ pub mod managment {
 			}
 		}
 
-		pub fn initialize_table(table_name: Cow<'_, str>) -> Result<Cow<'_, str>, ()> {
+		pub fn initialize_tables() -> Result<(), ()> {
 			if let Ok(connection) = connect() {
-				let query = format!("
+				let query = String::from("
 					PRAGMA foreign_keys = ON;
-					CREATE TABLE IF NOT EXISTS {} (
+					CREATE TABLE IF NOT EXISTS main (
 						name 	TEXT NOT NULL,
 						author 	TEXT NOT NULL,
 						path 	TEXT NOT NULL,
 						extension TEXT NOT NULL,
 						file_size INTEGER,
-						source 	TEXT
+						source 	INTEGER
 						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
 					);
-					CREATE INDEX name_index ON main(name);
-					CREATE INDEX author_index ON main(author);
-					CREATE INDEX source_index ON main(source);
-				", table_name.clone().as_ref());
+					CREATE TABLE IF NOT EXISTS sources (
+						id		INTEGER PRIMARY KEY AUTOINCREMENT,
+						origin 	TEXT NOT NULL,
+						path 	TEXT NOT NULL UNIQUE,
+						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
+					);
+					CREATE INDEX IF NOT EXISTS name_index ON main(name);
+					CREATE INDEX IF NOT EXISTS author_index ON main(author);
+					CREATE INDEX IF NOT EXISTS source_index ON main(source);
+				");
 
-				connection.execute(query).unwrap();
-				return Ok(table_name);
+				let response = connection.execute(query);
+
+				match response {
+					Ok(_) => return Ok(()),
+					Err(error) => println!("Error occured: {}", error),
+				}
 			}
 
 			Err(())
 		}
 
-		pub fn get_table(table_name: Cow<'_, str>) {
-			if let Ok(connection) = connect() {
-				let query = format!("SELECT * FROM {}", table_name.as_ref());
-
-				let result = connection
-					.iterate(query, |pairs| {
-						for &(key, value) in pairs.iter() {
-							println!("{} = {}", key, value.unwrap());
+		pub fn get_table<T: FromRow + CreateKey>(table_name: Cow<'_, str>)
+			-> Result<HashMap<String, T>, CError>
+		{
+			match connect() {
+				Ok(connection) => {
+					let mut hashmap: HashMap<String, T> = HashMap::new();
+					let query = format!("SELECT * FROM {}", table_name.as_ref());
+					let statement = connection.prepare(query);
+	
+					for row in statement
+						.unwrap()
+						.into_iter()
+						.bind((1, 50))
+						.unwrap()
+						.map(|row| row.unwrap()) 
+					{
+						if let Ok(value) = T::from_row(row) {
+							let key = value.create_key();
+							hashmap.insert(key, value);
 						}
-
-						true
-					});
-
-				println!("get_index result {:?}", result);
+					}
+	
+					return Ok(hashmap)
+				},
+				Err(error) => Err(error),
 			}
 		}
 
-		pub fn add_records(table_name: Cow<'_, str>, new_records: Vec<MediaFile>) {
+		pub fn add_record<T: std::fmt::Display>(table_name: Cow<'_, str>, new_record: T) {
+			if let Ok(connection) = connect() {
+				let query: String = format!(
+					"INSERT INTO {} (origin, path) VALUES {}",
+					table_name.clone().into_owned(),
+					new_record
+				);
+
+				if connection.execute(&query).is_err() {
+					println!("Failed to execute add_record: {}", query);
+				};
+			}
+		}
+
+		pub fn add_records<T: std::fmt::Display>(table_name: Cow<'_, str>, new_records: HashMap<String, T>) {
 			if let Ok(connection) = connect() {
 				let mut result: HashMap<usize, bool> = HashMap::new();
 
-				for record in new_records {
-					let query = format!(
+				for hash in new_records {
+					let record = hash.1;
+					let query: String = format!(
 						"INSERT INTO {} (name, author, path, extension, file_size, source) VALUES {}",
 						table_name.clone().into_owned(),
 						record
