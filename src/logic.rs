@@ -184,7 +184,7 @@ pub mod managment {
 		pub fn initialize_table(table_name: Cow<'_, str>) -> Result<Cow<'_, str>, ()> {
 			if let Ok(connection) = connect() {
 				let query = format!("
-					PAGMA foreign_keys = ON;
+					PRAGMA foreign_keys = ON;
 					CREATE TABLE IF NOT EXISTS {} (
 						name 	TEXT NOT NULL,
 						author 	TEXT NOT NULL,
