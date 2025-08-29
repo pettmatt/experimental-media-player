@@ -291,33 +291,35 @@ pub mod managment {
 
 		pub fn initialize_tables() -> Result<(), ()> {
 			if let Ok(connection) = connect() {
-				let query = "
-					PRAGMA foreign_keys = ON;
-					CREATE TABLE IF NOT EXISTS main (
+				let queries = [
+					"PRAGMA foreign_keys = ON;",
+					"CREATE TABLE IF NOT EXISTS main (
 						name 	TEXT NOT NULL,
 						author 	TEXT NOT NULL,
 						path 	TEXT NOT NULL,
 						extension TEXT NOT NULL,
 						file_size INTEGER,
-						source 	INTEGER
+						source 	INTEGER,
 						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
-					);
-					CREATE TABLE IF NOT EXISTS sources (
+					);",
+					"CREATE TABLE IF NOT EXISTS sources (
 						id		INTEGER PRIMARY KEY AUTOINCREMENT,
 						origin 	TEXT NOT NULL,
 						path 	TEXT NOT NULL UNIQUE,
 						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
-					);
-					CREATE INDEX IF NOT EXISTS name_index ON main(name);
-					CREATE INDEX IF NOT EXISTS author_index ON main(author);
-					CREATE INDEX IF NOT EXISTS source_index ON main(source);
-				";
+					);",
+					"CREATE INDEX IF NOT EXISTS name_index ON main(name);",
+					"CREATE INDEX IF NOT EXISTS author_index ON main(author);",
+					"CREATE INDEX IF NOT EXISTS source_index ON main(source);"
+				];
 
-				let response = connection.execute(&query, ());
+				for query in queries {
+					let response = connection.execute(query, ());
 
-				match response {
-					Ok(_) => return Ok(()),
-					Err(error) => println!("Error occured: {}", error),
+					match response {
+						Ok(_) => return Ok(()),
+						Err(error) => println!("Error occured: {}", error),
+					}
 				}
 			}
 
@@ -338,14 +340,12 @@ pub mod managment {
 							Ok(T::from_row(row).unwrap())
 						})?;
 
-					for row in iter {
-						if let Ok(record) = row {
-							let key = record.create_key();
-							hashmap.insert(key, record);
-						}
+					for record in iter.flatten() {
+						let key = record.create_key();
+						hashmap.insert(key, record);
 					}
 	
-					return Ok(hashmap);
+					Ok(hashmap)
 				},
 				Err(error) => Err(error),
 			}

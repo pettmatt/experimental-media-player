@@ -34,13 +34,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 	}
 
 	let app = AppWindow::new()?;
-    // app.on_request_increase_value({
-    //     let ui_handle = app.as_weak();
-    //     move || {
-    //         let ui = ui_handle.unwrap();
-    //         ui.set_counter(ui.get_counter() + 1);
-    //     }
-    // });
 
 	ui::handle_events(&app);
 
