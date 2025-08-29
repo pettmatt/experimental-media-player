@@ -74,13 +74,13 @@ pub mod managment {
 
 		impl std::fmt::Display for MediaFile {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				write!(f, "({}, {}, {}, {}, {})", self.name, self.author, self.path, self.extension, self.file_size)
+				write!(f, "{}, {}, {}, {}, {}", self.name, self.author, self.path, self.extension, self.file_size)
 			}
 		}
 
 		impl std::fmt::Display for Source {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				write!(f, "({}, {})", self.origin, self.path)
+				write!(f, "{}, {}", self.origin, self.path)
 			}
 		}
 
@@ -195,6 +195,11 @@ pub mod managment {
 		use thiserror::Error;
     	use super::source::{MediaFile, Source};
 
+		pub struct SourceIndex {
+			id: i32,
+			path: String
+		}
+
 		pub trait FromRow {
 			fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> where Self: Sized;
 		}
@@ -220,6 +225,15 @@ pub mod managment {
 			}
 		}
 
+		impl FromRow for SourceIndex {
+			fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+				Ok(SourceIndex {
+					id: row.get("id")?,
+					path: row.get("path")?,
+				})
+			}
+		}
+
 		pub trait CreateKey {
 			fn create_key(&self) -> String;
 		}
@@ -232,7 +246,13 @@ pub mod managment {
 
 		impl CreateKey for Source {
 			fn create_key(&self) -> String {
-				format!("{}", self.path)
+				String::from(&self.path)
+			}
+		}
+
+		impl CreateKey for SourceIndex {
+			fn create_key(&self) -> String {
+				self.id.to_string()
 			}
 		}
 
@@ -246,6 +266,47 @@ pub mod managment {
 		impl rusqlite::ToSql for Source {
 			fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
 				self.to_sql()
+			}
+		}
+
+		pub enum SqlQueries {
+			Insert,
+			Select
+		}
+
+		pub trait GetQuery {
+			fn get_query(&self, query: SqlQueries) -> String;
+		}
+
+		impl GetQuery for Source {
+			fn get_query(&self, query: SqlQueries) -> String {
+				match query {
+					SqlQueries::Insert => String::from("INSERT INTO (?1) (origin, path) VALUES (?2);"),
+					SqlQueries::Select => String::from("SELECT * FROM (?1);"),
+				}
+			}
+		}
+
+		impl GetQuery for SourceIndex {
+			fn get_query(&self, query: SqlQueries) -> String {
+				match query {
+					SqlQueries::Insert => String::from("INSERT INTO (?1) (origin, path) VALUES (?2);"),
+					SqlQueries::Select => String::from("SELECT * FROM (?1);"),
+				}
+			}
+		}
+
+		impl GetQuery for MediaFile {
+			fn get_query(&self, query: SqlQueries) -> String {
+				match query {
+					SqlQueries::Insert => {
+						String::from("
+							INSERT INTO (?1) (name, author, path, extension, file_size, source)
+							VALUES (?2);
+						")
+					},
+					SqlQueries::Select => String::from("SELECT * FROM (?1);"),
+				}
 			}
 		}
 
@@ -293,6 +354,12 @@ pub mod managment {
 			if let Ok(connection) = connect() {
 				let queries = [
 					"PRAGMA foreign_keys = ON;",
+					"CREATE TABLE IF NOT EXISTS sources (
+						id		INTEGER PRIMARY KEY AUTOINCREMENT,
+						origin 	TEXT NOT NULL,
+						path 	TEXT NOT NULL UNIQUE,
+						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
+					);",
 					"CREATE TABLE IF NOT EXISTS main (
 						name 	TEXT NOT NULL,
 						author 	TEXT NOT NULL,
@@ -300,17 +367,13 @@ pub mod managment {
 						extension TEXT NOT NULL,
 						file_size INTEGER,
 						source 	INTEGER,
-						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
-					);",
-					"CREATE TABLE IF NOT EXISTS sources (
-						id		INTEGER PRIMARY KEY AUTOINCREMENT,
-						origin 	TEXT NOT NULL,
-						path 	TEXT NOT NULL UNIQUE,
-						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
+						created_on DATETIME DEFAULT (datetime('now', 'localtime')),
+						FOREIGN KEY (source) REFERENCES sources(id)
 					);",
 					"CREATE INDEX IF NOT EXISTS name_index ON main(name);",
 					"CREATE INDEX IF NOT EXISTS author_index ON main(author);",
-					"CREATE INDEX IF NOT EXISTS source_index ON main(source);"
+					"CREATE INDEX IF NOT EXISTS source_index ON main(source);",
+					"CREATE INDEX IF NOT EXISTS sources_index ON sources(path);"
 				];
 
 				for query in queries {
@@ -326,13 +389,13 @@ pub mod managment {
 			Err(())
 		}
 
-		pub fn get_table<T: FromRow + CreateKey>(table_name: Cow<'_, str>)
+		pub fn get_table<T: FromRow + CreateKey + GetQuery>(table_name: Cow<'_, str>)
 			-> Result<HashMap<String, T>, CError>
 		{
 			match connect() {
 				Ok(connection) => {
 					let mut hashmap: HashMap<String, T> = HashMap::new();
-					let query = format!("SELECT * FROM {}", table_name.as_ref());
+					let query = format!("SELECT * FROM {};", table_name.as_ref());
 					let mut statement = connection.prepare(&query)?;
 	
 					let iter = statement
@@ -351,10 +414,13 @@ pub mod managment {
 			}
 		}
 
-		pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql>(table_name: Cow<'_, str>, new_record: T) {
+		pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery>(
+			table_name: Cow<'_, str>,
+			new_record: T
+		) {
 			if let Ok(connection) = connect() {
 				if connection.execute(
-					"INSERT INTO (?1) (origin, path) VALUES (?2)",
+					&new_record.get_query(SqlQueries::Insert),
 					(table_name.clone().into_owned(), &new_record)
 				).is_err() {
 					println!("Failed to execute add_record: {:?}", new_record);
@@ -362,7 +428,10 @@ pub mod managment {
 			}
 		}
 
-		pub fn add_records<T: std::fmt::Display + rusqlite::ToSql>(table_name: Cow<'_, str>, new_records: HashMap<String, T>) {
+		pub fn add_records<T: std::fmt::Display + rusqlite::ToSql + GetQuery>(
+			table_name: Cow<'_, str>,
+			new_records: HashMap<String, T>
+		) {
 			if let Ok(connection) = connect() {
 				let mut result: HashMap<usize, bool> = HashMap::new();
 
@@ -372,7 +441,7 @@ pub mod managment {
 					let mut value = true;
 					
 					if connection.execute(
-						"INSERT INTO (?1) (name, author, path, extension, file_size, source) VALUES (?2)",
+						&record.get_query(SqlQueries::Insert),
 						(table_name.clone().into_owned(), record)
 					).is_err() {
 						value = false;
