@@ -150,22 +150,36 @@ pub mod managment {
 
 		pub fn get_local_files() -> HashMap<String, MediaFile> {
 			// Fetch sources.
-			let source = database::get_table(Cow::from("sources"));
-			let mut hashmap: HashMap<String, MediaFile> = HashMap::new();
+			let source_hashmap = database::get_table::<Source>(Cow::from("sources"));
+			let mut file_hashmap: HashMap<String, MediaFile> = HashMap::new();
 
-			match source {
-				Some(source) => {
-					println!("Directory fetched correctly {:?}", source);
+			match source_hashmap {
+				Ok(sources) => {
+					println!("Table fetched correctly {:?}", sources);
 					// Add new source to sources.
 					// Read through the source on new source added.
 					// Check if there is neat way to do this, or do I need to manually call the function here.
 					// let files = read_source(source).expect("Couldn't fetch all files");
-					hashmap = read_source(source).expect("Couldn't fetch all files");
+					for hash_item in sources {
+						if hash_item.0 == "local" {
+							let source: Source = hash_item.1;
+							let path = PathBuf::from(source.path);
+							let files: HashMap<String, MediaFile> = read_source(path)
+								.expect("Couldn't fetch all files");
+
+							file_hashmap.extend(files);
+						} else {
+							println!("Not a local source {:?}", hash_item);
+						}
+					}
+
 				},
-				None => println!("Didn't receive a path. Result should be None: {:?}", source)
+				Err(error) => {
+					println!("Detailed error message: {}", error);
+				}
 			}
 
-			hashmap
+			file_hashmap
 		}
 
 		fn update_index() {}
@@ -176,8 +190,8 @@ pub mod managment {
 	}
 
 	pub mod database {
-    	use std::{borrow::Cow, collections::HashMap, fmt::Error, io::Error, path::Path, sync::Arc};
-		use sqlite::{Row, State};
+    	use std::{borrow::Cow, collections::HashMap};
+		use sqlite::Row;
 		use thiserror::Error;
     	use super::source::{MediaFile, Source};
 
