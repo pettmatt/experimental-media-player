@@ -191,31 +191,31 @@ pub mod managment {
 
 	pub mod database {
     	use std::{borrow::Cow, collections::HashMap};
-		use sqlite::Row;
+		use rusqlite::{Connection, ErrorCode, Row};
 		use thiserror::Error;
     	use super::source::{MediaFile, Source};
 
 		pub trait FromRow {
-			fn from_row(row: Row) -> Result<Self, Box<dyn std::error::Error>> where Self: Sized;
+			fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> where Self: Sized;
 		}
 
 		impl FromRow for MediaFile {
-			fn from_row(row: Row) -> Result<Self, Box<dyn std::error::Error>> {
+			fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
 				Ok(MediaFile {
-					name: row.read(0)?,
-					author: row.read(1)?,
-					extension: row.read(2)?,
-					path: row.read(3)?,
-					file_size: row.read(4)?,
+					name: row.get(0)?,
+					author: row.get(1)?,
+					extension: row.get(2)?,
+					path: row.get(3)?,
+					file_size: row.get(4)?,
 				})
 			}
 		}
 
 		impl FromRow for Source {
-			fn from_row(row: Row) -> Result<Self, Box<dyn std::error::Error>> {
+			fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
 				Ok(Source {
-					origin: row.read(0)?,
-					path: row.read(1)?,
+					origin: row.get("origin")?,
+					path: row.get("path")?,
 				})
 			}
 		}
@@ -236,17 +236,30 @@ pub mod managment {
 			}
 		}
 
+		impl rusqlite::ToSql for MediaFile {
+			#[inline]
+			fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+				self.to_sql()
+			}
+		}
+
+		impl rusqlite::ToSql for Source {
+			fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+				self.to_sql()
+			}
+		}
+
 		#[derive(Error, Debug)]
 		pub enum CError {
 			#[error("SQLite error: {0}")]
-			Sqlite(#[from] sqlite::Error),
+			Sqlite(#[from] rusqlite::Error),
 			#[error("IO error: {0}")]
 			Io(#[from] std::io::Error),
 		}
 
-		fn connect() -> Result<sqlite::Connection, CError> {
+		fn connect() -> Result<Connection, CError> {
 			let db_path = String::from("./database/main.db");
-			let result = sqlite::open(&db_path);
+			let result: Result<Connection, rusqlite::Error> = Connection::open(&db_path);
 
 			match result {
 				Ok(connect) => Ok(connect),
@@ -254,7 +267,7 @@ pub mod managment {
 					println!("Error occured: {}", error);
 					println!("Trying to solve the problem by creating it.");
 
-					if error.code == Some(14) {
+					if error.sqlite_error_code() == Some(ErrorCode::NotFound) {
 						let mut builder = std::fs::DirBuilder::new();
 						builder.recursive(true).create("./database")?;
 
@@ -270,6 +283,7 @@ pub mod managment {
 						}
 					}
 
+					println!("Unhandled SQLite error occured: {}", error);
 					Err(CError::Sqlite(error))
 				}
 			}
@@ -277,7 +291,7 @@ pub mod managment {
 
 		pub fn initialize_tables() -> Result<(), ()> {
 			if let Ok(connection) = connect() {
-				let query = String::from("
+				let query = "
 					PRAGMA foreign_keys = ON;
 					CREATE TABLE IF NOT EXISTS main (
 						name 	TEXT NOT NULL,
@@ -297,9 +311,9 @@ pub mod managment {
 					CREATE INDEX IF NOT EXISTS name_index ON main(name);
 					CREATE INDEX IF NOT EXISTS author_index ON main(author);
 					CREATE INDEX IF NOT EXISTS source_index ON main(source);
-				");
+				";
 
-				let response = connection.execute(query);
+				let response = connection.execute(&query, ());
 
 				match response {
 					Ok(_) => return Ok(()),
@@ -317,57 +331,50 @@ pub mod managment {
 				Ok(connection) => {
 					let mut hashmap: HashMap<String, T> = HashMap::new();
 					let query = format!("SELECT * FROM {}", table_name.as_ref());
-					let statement = connection.prepare(query);
+					let mut statement = connection.prepare(&query)?;
 	
-					for row in statement
-						.unwrap()
-						.into_iter()
-						.bind((1, 50))
-						.unwrap()
-						.map(|row| row.unwrap()) 
-					{
-						if let Ok(value) = T::from_row(row) {
-							let key = value.create_key();
-							hashmap.insert(key, value);
+					let iter = statement
+						.query_map([], |row| {
+							Ok(T::from_row(row).unwrap())
+						})?;
+
+					for row in iter {
+						if let Ok(record) = row {
+							let key = record.create_key();
+							hashmap.insert(key, record);
 						}
 					}
 	
-					return Ok(hashmap)
+					return Ok(hashmap);
 				},
 				Err(error) => Err(error),
 			}
 		}
 
-		pub fn add_record<T: std::fmt::Display>(table_name: Cow<'_, str>, new_record: T) {
+		pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql>(table_name: Cow<'_, str>, new_record: T) {
 			if let Ok(connection) = connect() {
-				let query: String = format!(
-					"INSERT INTO {} (origin, path) VALUES {}",
-					table_name.clone().into_owned(),
-					new_record
-				);
-
-				if connection.execute(&query).is_err() {
-					println!("Failed to execute add_record: {}", query);
+				if connection.execute(
+					"INSERT INTO (?1) (origin, path) VALUES (?2)",
+					(table_name.clone().into_owned(), &new_record)
+				).is_err() {
+					println!("Failed to execute add_record: {:?}", new_record);
 				};
 			}
 		}
 
-		pub fn add_records<T: std::fmt::Display>(table_name: Cow<'_, str>, new_records: HashMap<String, T>) {
+		pub fn add_records<T: std::fmt::Display + rusqlite::ToSql>(table_name: Cow<'_, str>, new_records: HashMap<String, T>) {
 			if let Ok(connection) = connect() {
 				let mut result: HashMap<usize, bool> = HashMap::new();
 
 				for hash in new_records {
 					let record = hash.1;
-					let query: String = format!(
-						"INSERT INTO {} (name, author, path, extension, file_size, source) VALUES {}",
-						table_name.clone().into_owned(),
-						record
-					);
-
 					let key = result.len();
 					let mut value = true;
 					
-					if connection.execute(query).is_err() {
+					if connection.execute(
+						"INSERT INTO (?1) (name, author, path, extension, file_size, source) VALUES (?2)",
+						(table_name.clone().into_owned(), record)
+					).is_err() {
 						value = false;
 					};
 

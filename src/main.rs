@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{borrow::Cow, error::Error, fmt, i32};
-use logic::ui;
+use logic::{managment::{database, source::{get_local_files, MediaFile}}, ui};
 
 mod logic;
 
@@ -24,13 +24,15 @@ struct Authentication {}
 fn main() -> Result<(), Box<dyn Error>> {
 	// let state: State; // Will hold the main state of Slint
 	
-	{ // Database initialization
-		let table = Cow::from("main");
-		if logic::managment::database::initialize_table(table.clone()).is_ok() {
-			logic::managment::database::get_table(table)
+	{ // Initialization & recover last state
+		if database::initialize_tables().is_ok() {
+			let table = Cow::from("main");
+			let result = database::get_table::<MediaFile>(table);
+		} else {
+			println!("Couldn't create db connection for initialization")
 		}
 	}
-	
+
 	let app = AppWindow::new()?;
     // app.on_request_increase_value({
     //     let ui_handle = app.as_weak();
@@ -41,6 +43,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // });
 
 	ui::handle_events(&app);
+
+	{ // Update the state, incase something has chagned
+		let local_files = get_local_files();
+		database::add_records(Cow::from("main"), local_files);
+	}
 
     app.run()?;
 
