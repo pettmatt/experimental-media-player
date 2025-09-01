@@ -24,12 +24,9 @@ pub mod ui {
 					}
 
 					println!("Directory fetched correctly {:?}", source);
-					let files = read_source(source).expect("Couldn't fetch all files");
-					println!("files read correctly {:?}", files);
-					// Add new source to sources.
-					// Read through the source on new source added.
-					// Check if there is neat way to do this, or do I need to manually call the function here.
-					// let list: HashMap<String, Vec<String>> = read_source(result);
+					let records = read_source(source).expect("Couldn't fetch all files");
+					println!("files read correctly {:?}", records);
+					database::add_records(records);
 				},
 				None => println!("Didn't receive a path. Result should be None: {:?}", source)
 			}
@@ -51,9 +48,13 @@ pub mod ui {
 
 pub mod managment {
 	pub mod source {
-		use std::{borrow::Cow, collections::HashMap, fmt::Error, fs, path::{Path, PathBuf}};
+		use std::{collections::HashMap, fmt::Error, fs, path::{Path, PathBuf}};
 		use native_dialog::DialogBuilder;
 		use super::database::{self, CError};
+
+		pub trait Instanceable {
+			fn new() -> Self;
+		}
 
 		#[derive(Debug, Clone)]
 		pub struct MediaFile {
@@ -64,10 +65,28 @@ pub mod managment {
 			pub file_size: u64,
 		}
 
+		impl Instanceable for MediaFile {
+			fn new() -> Self {
+				Self {
+					name: "".to_string(),
+					artist: "".to_string(),
+					path: "".to_string(),
+					extension: "".to_string(),
+					file_size: 0,
+				}
+			}
+		}
+
 		#[derive(Debug, Clone)]
 		pub struct Source {
 			pub origin: String,
 			pub path: String,
+		}
+
+		impl Instanceable for Source {
+			fn new() -> Self {
+				Self { origin: "".to_string(), path: "".to_string() }
+			}
 		}
 
 		impl std::fmt::Display for MediaFile {
@@ -128,14 +147,17 @@ pub mod managment {
 					};
 
 					if mime_type.is_some() {
-						let artist = String::from("None");
-						let key = format!("{}.{}", file_name, artist);
+						let name_array: Vec<&str> = file_name.split(".").collect();
+						let audio_name = name_array[0];
+						let artist = String::from("unknown");
+						let key = format!("{}.{}", audio_name, artist);
+						let path = format!("{:?}", entry_path);
 
 						hashmap.entry(key).or_insert(MediaFile {
 							artist,
 							name: file_name,
-							extension: String::from(file_extension),
-							path: String::from(""),
+							extension: file_extension.to_string(),
+							path,
 							file_size,
 						});
 					} else {
@@ -152,7 +174,7 @@ pub mod managment {
 
 		pub fn validate_sources() -> Result<HashMap<String, MediaFile>, CError> {
 			// Fetch sources.
-			let source_hashmap = database::get_table::<Source>(Cow::from("sources"));
+			let source_hashmap = database::get_table::<Source>();
 			let mut file_hashmap: HashMap<String, MediaFile> = HashMap::new();
 
 			match source_hashmap {
@@ -160,7 +182,7 @@ pub mod managment {
 					println!("Table fetched correctly: {:?}", sources);
 
 					for hash_item in sources {
-						if hash_item.0 == "local" {
+						if hash_item.1.origin == "local" {
 							let source: Source = hash_item.1;
 							let path = PathBuf::from(source.path);
 							let files: HashMap<String, MediaFile> = read_source(path)
@@ -189,10 +211,10 @@ pub mod managment {
 	}
 
 	pub mod database {
-    	use std::{any::Any, borrow::Cow, collections::HashMap};
-		use rusqlite::{params, Connection, ErrorCode, Row, ToSql};
 		use thiserror::Error;
-    	use super::source::{MediaFile, Source};
+    	use std::collections::HashMap;
+		use rusqlite::{ffi::Error, Connection, ErrorCode, Row, ToSql};
+    	use super::source::{Instanceable, MediaFile, Source};
 
 		pub struct SourceIndex {
 			id: i32,
@@ -307,7 +329,7 @@ pub mod managment {
 							VALUES (?, ?, ?, ?, ?, ?);
 						")
 					},
-					SqlQueries::Select => String::from("SELECT * FROM (?1);"),
+					SqlQueries::Select => String::from("SELECT * FROM main;"),
 				}
 			}
 		}
@@ -393,36 +415,41 @@ pub mod managment {
 						path 	TEXT NOT NULL,
 						extension TEXT NOT NULL,
 						file_size INTEGER,
-						source 	INTEGER,
-						created_on DATETIME DEFAULT (datetime('now', 'localtime')),
-						FOREIGN KEY (source) REFERENCES sources(id)
+						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
 					);",
+					// source 	INTEGER,
+					// FOREIGN KEY (source) REFERENCES sources(id)
 					"CREATE INDEX IF NOT EXISTS name_index ON main(name);",
 					"CREATE INDEX IF NOT EXISTS author_index ON main(author);",
-					"CREATE INDEX IF NOT EXISTS source_index ON main(source);",
+					// "CREATE INDEX IF NOT EXISTS source_index ON main(source);",
 					"CREATE INDEX IF NOT EXISTS sources_index ON sources(path);"
 				];
 
+				let mut index = 0;
 				for query in queries {
+					index += 1;
 					let response = connection.execute(query, ());
 
-					match response {
-						Ok(_) => return Ok(()),
-						Err(error) => println!("Error occured: {}", error),
+					if let Err(message) = response {
+						println!("Error occured while initializing ({}): {:?}", index, message);
+						return Err(());
 					}
 				}
+
+				return Ok(());
 			}
 
 			Err(())
 		}
 
-		pub fn get_table<T: FromRow + CreateKey + GetQuery>(table_name: Cow<'_, str>)
+		pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instanceable>()
 			-> Result<HashMap<String, T>, CError>
 		{
 			match connect() {
 				Ok(connection) => {
 					let mut hashmap: HashMap<String, T> = HashMap::new();
-					let query = format!("SELECT * FROM {};", table_name.as_ref());
+					let instance = T::new();
+					let query = instance.get_query(SqlQueries::Select);
 					let mut statement = connection.prepare(&query)?;
 	
 					let iter = statement
@@ -454,26 +481,41 @@ pub mod managment {
 			}
 		}
 
-		pub fn add_records<T: std::fmt::Display + rusqlite::ToSql + GetQuery + ToSqlParams>(
+		#[derive(std::fmt::Debug)]
+		struct ErrorBody {
+			is_error: bool,
+			message: Result<usize, rusqlite::Error>,
+		}
+
+		pub fn add_records<T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
 			new_records: HashMap<String, T>
 		) {
 			if let Ok(connection) = connect() {
-				let mut result: HashMap<usize, bool> = HashMap::new();
+				println!("Add records: {:?}", &new_records);
+				let mut result: HashMap<usize, ErrorBody> = HashMap::new();
 
 				for hash in new_records {
 					let record = hash.1;
 					let key = result.len();
-					let mut value = true;
-					
-					if connection.execute(
-						&record.get_query(SqlQueries::Insert),
-						record.to_sql_params().as_slice()
-					).is_err() {
-						value = false;
+					let mut response = ErrorBody {
+						is_error: false,
+						message: Ok(0),
 					};
 
-					result.insert(key, value);
+					let ex_result = connection.execute(
+						&record.get_query(SqlQueries::Insert),
+						record.to_sql_params().as_slice()
+					);
+
+					if ex_result.is_err() {
+						response.is_error = true;
+						response.message = ex_result;
+					};
+
+					result.insert(key, response);
 				}
+
+				println!("Failure Hashmap: {:?}", result);
 			}
 		}
 	}

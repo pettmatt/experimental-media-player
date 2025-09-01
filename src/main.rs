@@ -1,7 +1,7 @@
 // Prevent console window in addition to Slint window in Windows release builds when, e.g., starting the app via file manager. Ignored on other platforms.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{borrow::Cow, error::Error, fmt, i32};
+use std::error::Error;
 use logic::{managment::{database, source::{validate_sources, MediaFile}}, ui};
 
 mod logic;
@@ -26,8 +26,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 	
 	{ // Initialization & recover last state
 		if database::initialize_tables().is_ok() {
-			let table = Cow::from("main");
-			let media_hashmap = database::get_table::<MediaFile>(table)?;
+			println!("Database initialized");
+			let media_hashmap = database::get_table::<MediaFile>()?;
 			println!("Fetched most recent details: {:?}", media_hashmap);
 		} else {
 			println!("Couldn't create db connection for initialization")
@@ -43,6 +43,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 		println!("Checked files {:?}", &read_sources);
 		database::add_records(read_sources);
 		println!("Updated file sources");
+		let media_hashmap = database::get_table::<MediaFile>()?;
+		println!("Files: {:?}", media_hashmap);
 	}
 
     app.run()?;
