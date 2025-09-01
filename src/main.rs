@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{borrow::Cow, error::Error, fmt, i32};
-use logic::{managment::{database, source::{get_local_files, MediaFile}}, ui};
+use logic::{managment::{database, source::{validate_sources, MediaFile}}, ui};
 
 mod logic;
 
@@ -27,7 +27,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 	{ // Initialization & recover last state
 		if database::initialize_tables().is_ok() {
 			let table = Cow::from("main");
-			let result = database::get_table::<MediaFile>(table);
+			let media_hashmap = database::get_table::<MediaFile>(table)?;
+			println!("Fetched most recent details: {:?}", media_hashmap);
 		} else {
 			println!("Couldn't create db connection for initialization")
 		}
@@ -38,8 +39,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 	ui::handle_events(&app);
 
 	{ // Update the state, incase something has chagned
-		let local_files = get_local_files();
-		database::add_records(Cow::from("main"), local_files);
+		let read_sources = validate_sources()?;
+		println!("Checked files {:?}", &read_sources);
+		database::add_records(read_sources);
+		println!("Updated file sources");
 	}
 
     app.run()?;

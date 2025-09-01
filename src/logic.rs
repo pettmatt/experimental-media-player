@@ -1,6 +1,4 @@
 pub mod ui {
-    use std::borrow::Cow;
-
     use crate::{logic::managment::{database, source::{read_source, Source}}, AppWindow};
     use super::managment::source::new_local_source;
 
@@ -19,7 +17,7 @@ pub mod ui {
 				Some(source) => {
 					{
 						let path_string = source.clone().to_str().unwrap().to_string();
-						database::add_record(Cow::from("sources"), Source {
+						database::add_record(Source {
 							origin: String::from("local"),
 							path: path_string
 						});
@@ -55,18 +53,18 @@ pub mod managment {
 	pub mod source {
 		use std::{borrow::Cow, collections::HashMap, fmt::Error, fs, path::{Path, PathBuf}};
 		use native_dialog::DialogBuilder;
-		use super::database;
+		use super::database::{self, CError};
 
-		#[derive(Debug)]
+		#[derive(Debug, Clone)]
 		pub struct MediaFile {
 			pub name: String,
-			pub author: String,
+			pub artist: String,
 			pub path: String,
 			pub extension: String,
 			pub file_size: u64,
 		}
 
-		#[derive(Debug)]
+		#[derive(Debug, Clone)]
 		pub struct Source {
 			pub origin: String,
 			pub path: String,
@@ -74,7 +72,7 @@ pub mod managment {
 
 		impl std::fmt::Display for MediaFile {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-				write!(f, "{}, {}, {}, {}, {}", self.name, self.author, self.path, self.extension, self.file_size)
+				write!(f, "{}, {}, {}, {}, {}", self.name, self.artist, self.path, self.extension, self.file_size)
 			}
 		}
 
@@ -113,7 +111,8 @@ pub mod managment {
 				} else {
 					let file_name = entry.file_name().to_string_lossy().to_string();
 					println!("Entry_path {:?}", &entry_path);
-					let metadata = fs::metadata(&entry_path).expect("Couldn't get metadata");
+					let metadata = fs::metadata(&entry_path)
+						.expect("Couldn't get metadata");
 					let file_size = metadata.len();
 
 					let file_extension = Path::new(&entry_path)
@@ -128,17 +127,20 @@ pub mod managment {
 						_ => None
 					};
 
-					if mime_type != None {
-						let author = String::from("None");
-						let key = format!("{}.{}", file_name, author);
+					if mime_type.is_some() {
+						let artist = String::from("None");
+						let key = format!("{}.{}", file_name, artist);
 
 						hashmap.entry(key).or_insert(MediaFile {
-							author,
+							artist,
 							name: file_name,
 							extension: String::from(file_extension),
 							path: String::from(""),
 							file_size,
 						});
+					} else {
+						println!("Unknown mime_type: {:?}", mime_type);
+						println!("Unhandled file_extension: {:?}", file_extension);
 					}
 				}
 			}
@@ -148,38 +150,35 @@ pub mod managment {
 
 		pub fn read_sources() {}
 
-		pub fn get_local_files() -> HashMap<String, MediaFile> {
+		pub fn validate_sources() -> Result<HashMap<String, MediaFile>, CError> {
 			// Fetch sources.
 			let source_hashmap = database::get_table::<Source>(Cow::from("sources"));
 			let mut file_hashmap: HashMap<String, MediaFile> = HashMap::new();
 
 			match source_hashmap {
 				Ok(sources) => {
-					println!("Table fetched correctly {:?}", sources);
-					// Add new source to sources.
-					// Read through the source on new source added.
-					// Check if there is neat way to do this, or do I need to manually call the function here.
-					// let files = read_source(source).expect("Couldn't fetch all files");
+					println!("Table fetched correctly: {:?}", sources);
+
 					for hash_item in sources {
 						if hash_item.0 == "local" {
 							let source: Source = hash_item.1;
 							let path = PathBuf::from(source.path);
 							let files: HashMap<String, MediaFile> = read_source(path)
-								.expect("Couldn't fetch all files");
+								.expect("Couldn't validate some media files");
 
 							file_hashmap.extend(files);
 						} else {
 							println!("Not a local source {:?}", hash_item);
 						}
 					}
-
 				},
 				Err(error) => {
-					println!("Detailed error message: {}", error);
+					println!("Get_local_files() error message: {}", error);
+					return Err(error);
 				}
 			}
 
-			file_hashmap
+			Ok(file_hashmap)
 		}
 
 		fn update_index() {}
@@ -190,8 +189,8 @@ pub mod managment {
 	}
 
 	pub mod database {
-    	use std::{borrow::Cow, collections::HashMap};
-		use rusqlite::{Connection, ErrorCode, Row};
+    	use std::{any::Any, borrow::Cow, collections::HashMap};
+		use rusqlite::{params, Connection, ErrorCode, Row, ToSql};
 		use thiserror::Error;
     	use super::source::{MediaFile, Source};
 
@@ -208,7 +207,7 @@ pub mod managment {
 			fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
 				Ok(MediaFile {
 					name: row.get(0)?,
-					author: row.get(1)?,
+					artist: row.get(1)?,
 					extension: row.get(2)?,
 					path: row.get(3)?,
 					file_size: row.get(4)?,
@@ -240,7 +239,7 @@ pub mod managment {
 
 		impl CreateKey for MediaFile {
 			fn create_key(&self) -> String {
-				format!("{}.{}", self.author, self.name)
+				format!("{}.{}", self.artist, self.name)
 			}
 		}
 
@@ -281,32 +280,60 @@ pub mod managment {
 		impl GetQuery for Source {
 			fn get_query(&self, query: SqlQueries) -> String {
 				match query {
-					SqlQueries::Insert => String::from("INSERT INTO (?1) (origin, path) VALUES (?2);"),
-					SqlQueries::Select => String::from("SELECT * FROM (?1);"),
+					SqlQueries::Insert => String::from("
+						INSERT INTO sources (origin, path)
+						VALUES (?, ?);
+					"),
+					SqlQueries::Select => String::from("SELECT * FROM sources;"),
 				}
 			}
 		}
 
-		impl GetQuery for SourceIndex {
-			fn get_query(&self, query: SqlQueries) -> String {
-				match query {
-					SqlQueries::Insert => String::from("INSERT INTO (?1) (origin, path) VALUES (?2);"),
-					SqlQueries::Select => String::from("SELECT * FROM (?1);"),
-				}
-			}
-		}
+		// impl GetQuery for SourceIndex {
+		// 	fn get_query(&self, query: SqlQueries) -> String {
+		// 		match query {
+		// 			SqlQueries::Insert => String::from("INSERT INTO sources (origin, path) VALUES (?2);"),
+		// 			SqlQueries::Select => String::from("SELECT * FROM (?1);"),
+		// 		}
+		// 	}
+		// }
 
 		impl GetQuery for MediaFile {
 			fn get_query(&self, query: SqlQueries) -> String {
 				match query {
 					SqlQueries::Insert => {
 						String::from("
-							INSERT INTO (?1) (name, author, path, extension, file_size, source)
-							VALUES (?2);
+							INSERT INTO main (name, author, path, extension, file_size, source)
+							VALUES (?, ?, ?, ?, ?, ?);
 						")
 					},
 					SqlQueries::Select => String::from("SELECT * FROM (?1);"),
 				}
+			}
+		}
+
+		pub trait ToSqlParams {
+			fn to_sql_params(&self) -> Vec<&dyn ToSql>;
+		}
+
+		impl ToSqlParams for MediaFile {
+			fn to_sql_params(&self) -> Vec<&dyn ToSql> {
+				vec![
+					&self.artist as &dyn ToSql,
+					&self.name as &dyn ToSql,
+					&self.path as &dyn ToSql,
+					&self.extension as &dyn ToSql,
+					&self.file_size as &dyn ToSql,
+				]
+			}
+		}
+
+		impl ToSqlParams for Source {
+			fn to_sql_params(&self) -> Vec<&dyn ToSql> {
+				vec![
+					&self.origin as &dyn ToSql,
+					&self.path as &dyn ToSql,
+				]
 			}
 		}
 
@@ -414,22 +441,20 @@ pub mod managment {
 			}
 		}
 
-		pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery>(
-			table_name: Cow<'_, str>,
+		pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
 			new_record: T
 		) {
 			if let Ok(connection) = connect() {
 				if connection.execute(
 					&new_record.get_query(SqlQueries::Insert),
-					(table_name.clone().into_owned(), &new_record)
+					new_record.to_sql_params().as_slice()
 				).is_err() {
-					println!("Failed to execute add_record: {:?}", new_record);
+					println!("Failed to execute add_record: {:?}; {:?}", new_record, connection);
 				};
 			}
 		}
 
-		pub fn add_records<T: std::fmt::Display + rusqlite::ToSql + GetQuery>(
-			table_name: Cow<'_, str>,
+		pub fn add_records<T: std::fmt::Display + rusqlite::ToSql + GetQuery + ToSqlParams>(
 			new_records: HashMap<String, T>
 		) {
 			if let Ok(connection) = connect() {
@@ -442,7 +467,7 @@ pub mod managment {
 					
 					if connection.execute(
 						&record.get_query(SqlQueries::Insert),
-						(table_name.clone().into_owned(), record)
+						record.to_sql_params().as_slice()
 					).is_err() {
 						value = false;
 					};
