@@ -170,8 +170,6 @@ pub mod managment {
 			Ok(hashmap)
 		}
 
-		pub fn read_sources() {}
-
 		pub fn validate_sources() -> Result<HashMap<String, MediaFile>, CError> {
 			// Fetch sources.
 			let source_hashmap = database::get_table::<Source>();
@@ -202,8 +200,6 @@ pub mod managment {
 
 			Ok(file_hashmap)
 		}
-
-		fn update_index() {}
 	}
 
 	mod audio {
@@ -213,7 +209,7 @@ pub mod managment {
 	pub mod database {
 		use thiserror::Error;
     	use std::collections::HashMap;
-		use rusqlite::{ffi::Error, Connection, ErrorCode, Row, ToSql};
+		use rusqlite::{Connection, ErrorCode, Row, ToSql};
     	use super::source::{Instanceable, MediaFile, Source};
 
 		pub struct SourceIndex {
@@ -325,8 +321,8 @@ pub mod managment {
 				match query {
 					SqlQueries::Insert => {
 						String::from("
-							INSERT INTO main (name, author, path, extension, file_size, source)
-							VALUES (?, ?, ?, ?, ?, ?);
+							INSERT INTO main (name, artist, path, extension, file_size)
+							VALUES (?, ?, ?, ?, ?);
 						")
 					},
 					SqlQueries::Select => String::from("SELECT * FROM main;"),
@@ -341,8 +337,8 @@ pub mod managment {
 		impl ToSqlParams for MediaFile {
 			fn to_sql_params(&self) -> Vec<&dyn ToSql> {
 				vec![
-					&self.artist as &dyn ToSql,
 					&self.name as &dyn ToSql,
+					&self.artist as &dyn ToSql,
 					&self.path as &dyn ToSql,
 					&self.extension as &dyn ToSql,
 					&self.file_size as &dyn ToSql,
@@ -411,8 +407,8 @@ pub mod managment {
 					);",
 					"CREATE TABLE IF NOT EXISTS main (
 						name 	TEXT NOT NULL,
-						author 	TEXT NOT NULL,
-						path 	TEXT NOT NULL,
+						artist 	TEXT NOT NULL,
+						path 	TEXT NOT NULL UNIQUE,
 						extension TEXT NOT NULL,
 						file_size INTEGER,
 						created_on DATETIME DEFAULT (datetime('now', 'localtime'))
