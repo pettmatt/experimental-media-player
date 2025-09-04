@@ -53,20 +53,39 @@ pub mod ui {
 	}
 
 	mod audio_control_events {
-		pub fn handle_media_change(index: i32) {
-			let move_to_next_audio = index > 0;
-			println!("move_to_next_audio bool value: {}", move_to_next_audio);
+		use crate::{logic::{audio::MediaPlayer, database::{self, MediaFile, QueueItem}}, State};
+
+		pub fn handle_media_start(media_player: &mut MediaPlayer, start: bool, state: &State) {
+			if start {
+				media_player.media_start(state);
+			} else {
+				media_player.media_pause();
+			}
 		}
 
-		pub fn handle_media_start(start: bool) {
-			println!("start bool value: {}", start);
+		pub fn handle_media_change(media_player: &mut MediaPlayer, index: i32) {
+			let move_to_next_audio = index > 0;
+			// media_player.
 		}
-		
-		pub fn handle_media_loop(create_loop: bool) {
+
+		pub fn handle_media_loop(media_player: &mut MediaPlayer, create_loop: bool) {
 			println!("create_loop bool value: {}", create_loop);
 		}
 
-		pub fn handle_media_mix() {}
+		pub fn handle_media_mix() {
+
+		}
+
+		pub fn handle_add_media_queue(media_player: MediaPlayer, file_path: String, state: &State) {
+			if let Ok(()) = media_player.add_to_media_queue(&file_path) {
+				let media: &MediaFile = state.index.get(&file_path).unwrap();
+				database::add_record::<QueueItem>(QueueItem {
+					media_id: media.id
+				});
+			} else {
+				println!("Couldn't add to media queue");
+			}
+		}
 	}
 }
 

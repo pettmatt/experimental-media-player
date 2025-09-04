@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{collections::HashMap, error::Error};
-use logic::{database::{self, MediaFile}, ui};
+use logic::{database::{self, MediaFile, QueueItem}, ui};
 
 mod logic;
 
@@ -14,7 +14,7 @@ slint::include_modules!();
 struct State {
 	index: HashMap<String, MediaFile>,
 // 	playing: Result<None, fmt::Error>,
-// 	queue: Vec<String>,
+	queue: Vec<QueueItem>,
 // 	playlists: Vec<String>,
 // 	sources: Vec<String>,
 // 	settings: Settings
