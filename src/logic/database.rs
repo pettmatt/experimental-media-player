@@ -9,6 +9,7 @@ struct SourceIndex {
 
 #[derive(Debug, Clone)]
 pub struct MediaFile {
+	pub id: i32,
 	pub name: String,
 	pub artist: String,
 	pub path: String,
@@ -20,6 +21,12 @@ pub struct MediaFile {
 pub struct Source {
 	pub origin: String,
 	pub path: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct QueueItem {
+	pub media_id: i32,
+	pub currently_playing: bool,
 }
 
 impl std::fmt::Display for MediaFile {
@@ -41,6 +48,7 @@ pub trait Instanceable {
 impl Instanceable for MediaFile {
 	fn new() -> Self {
 		Self {
+			id: -1,
 			name: "".to_string(),
 			artist: "".to_string(),
 			path: "".to_string(),
@@ -56,27 +64,43 @@ impl Instanceable for Source {
 	}
 }
 
+impl Instanceable for QueueItem {
+	fn new() -> Self {
+		Self { media_id: -1, currently_playing: false }
+	}
+}
+
 trait FromRow {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> where Self: Sized;
 }
 
 impl FromRow for MediaFile {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-		Ok(MediaFile {
-			name: row.get(0)?,
-			artist: row.get(1)?,
-			extension: row.get(2)?,
-			path: row.get(3)?,
-			file_size: row.get(4)?,
+		Ok(Self {
+			id: row.get("id")?,
+			name: row.get("name")?,
+			artist: row.get("artist")?,
+			extension: row.get("extension")?,
+			path: row.get("path")?,
+			file_size: row.get("file_size")?,
 		})
 	}
 }
 
 impl FromRow for Source {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-		Ok(Source {
+		Ok(Self {
 			origin: row.get("origin")?,
 			path: row.get("path")?,
+		})
+	}
+}
+
+impl FromRow for QueueItem {
+	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+		Ok(Self {
+			media_id: row.get("media_id")?,
+			currently_playing: row.get("is_playing")?,
 		})
 	}
 }
@@ -96,13 +120,19 @@ trait CreateKey {
 
 impl CreateKey for MediaFile {
 	fn create_key(&self) -> String {
-		format!("{}.{}", self.artist, self.name)
+		format!("{}", self.path)
 	}
 }
 
 impl CreateKey for Source {
 	fn create_key(&self) -> String {
 		String::from(&self.path)
+	}
+}
+
+impl CreateKey for QueueItem {
+	fn create_key(&self) -> String {
+		self.media_id.to_string()
 	}
 }
 
@@ -120,6 +150,12 @@ impl rusqlite::ToSql for MediaFile {
 }
 
 impl rusqlite::ToSql for Source {
+	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+		self.to_sql()
+	}
+}
+
+impl rusqlite::ToSql for QueueItem {
 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
 		self.to_sql()
 	}
@@ -169,6 +205,20 @@ impl GetQuery for MediaFile {
 	}
 }
 
+impl GetQuery for QueueItem {
+	fn get_query(&self, query: SqlQueries) -> String {
+		match query {
+			SqlQueries::Insert => {
+				String::from("
+					INSERT INTO queue (media_id)
+					VALUES (?);
+				")
+			},
+			SqlQueries::Select => String::from("SELECT * FROM queue;"),
+		}
+	}
+}
+
 trait ToSqlParams {
 	fn to_sql_params(&self) -> Vec<&dyn ToSql>;
 }
@@ -190,6 +240,14 @@ impl ToSqlParams for Source {
 		vec![
 			&self.origin as &dyn ToSql,
 			&self.path as &dyn ToSql,
+		]
+	}
+}
+
+impl ToSqlParams for QueueItem {
+	fn to_sql_params(&self) -> Vec<&dyn ToSql> {
+		vec![
+			&self.media_id as &dyn ToSql,
 		]
 	}
 }
@@ -231,21 +289,30 @@ pub fn initialize_tables() -> Result<(), ()> {
 		let queries = [
 			"PRAGMA foreign_keys = ON;",
 			"CREATE TABLE IF NOT EXISTS sources (
-				id		INTEGER PRIMARY KEY AUTOINCREMENT,
-				origin 	TEXT NOT NULL,
-				path 	TEXT NOT NULL UNIQUE,
-				created_on DATETIME DEFAULT (datetime('now', 'localtime'))
+				id			INTEGER PRIMARY KEY AUTOINCREMENT,
+				origin 		TEXT NOT NULL,
+				path 		TEXT NOT NULL UNIQUE,
+				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			"CREATE TABLE IF NOT EXISTS main (
-				name 	TEXT NOT NULL,
-				artist 	TEXT NOT NULL,
-				path 	TEXT NOT NULL UNIQUE,
-				extension TEXT NOT NULL,
-				file_size INTEGER,
-				created_on DATETIME DEFAULT (datetime('now', 'localtime'))
-			);",
-			// source 	INTEGER,
+			// source_id 	INTEGER,
 			// FOREIGN KEY (source) REFERENCES sources(id)
+			"CREATE TABLE IF NOT EXISTS main (
+				id			INTEGER PRIMARY KEY AUTOINCREMENT,
+				name 		TEXT NOT NULL,
+				artist 		TEXT NOT NULL,
+				path 		TEXT NOT NULL UNIQUE,
+				extension 	TEXT NOT NULL,
+				file_size 	INTEGER,
+				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
+			"CREATE TABLE IF NOT EXISTS queue (
+				id			INTEGER PRIMARY KEY AUTOINCEMENT,
+				media_id	INTEGER NOT NULL,
+				is_playing	INTEGER NOT NULL,
+				FOREIGN KEY (media_id) REFERENCES main(id),
+				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
+			"CREATE UNIQUE INDEX IF NOT EXISTS path_index ON main(path);",
 			"CREATE INDEX IF NOT EXISTS name_index ON main(name);",
 			"CREATE INDEX IF NOT EXISTS author_index ON main(author);",
 			// "CREATE INDEX IF NOT EXISTS source_index ON main(source);",
