@@ -1,19 +1,186 @@
 use rodio::{self, Decoder, OutputStream, Sink};
-use std::{fs::File, io::BufReader, path::Path, time::Duration};
+use std::{fs::File, path::Path, thread::current, time::Duration};
+use crate::State;
+
+use super::database::{MediaFile, QueueItem};
 
 // Rodio docs: https://docs.rs/rodio/latest/rodio/
+// Note: The sound plays in a separate audio thread,
+// so we need to keep the main thread alive while it's playing.
 
-pub fn open_stream() -> (OutputStream, Sink) {
+pub struct MediaPlayer {
+	sink: Option<Sink>,
+	output_stream: Option<OutputStream>
+}
+
+impl MediaPlayer {
+	pub fn new(&self) -> Self {
+		Self { sink: None, output_stream: None }
+	}
+
+	pub fn media_start(&mut self, state: &State) {
+		let audio_hashmap = &state.index;
+		let audio = audio_hashmap.get(
+			"526d41262c0ce1a7_eed390b47b9242409d510068d0267ccf.webm"
+		);
+
+		if self.sink.is_none() {
+			let (output_stream, new_sink) = open_stream();
+			self.sink = Some(new_sink);
+			self.output_stream = Some(output_stream);
+		}
+
+		if let Some(sink) = &self.sink {
+			continue_audio(sink);
+			
+			if sink.is_paused() {
+				if let Some(a) = audio {
+					let audio_path = Path::new(&a.path);
+					if let Some(sink) = &self.sink {
+						start_playing_audio(sink, audio_path);
+					}
+				}
+			}
+		}
+	}
+
+	pub fn media_pause(&mut self) {
+		if let Some(sink) = &mut self.sink {
+			pause_audio(sink);
+		}
+	}
+
+	pub fn next_media(&self, state: &mut State) {
+		if let Some(sink) = &self.sink {
+			sink.skip_one();
+			update_currently_playing(state, 1);
+		}
+	}
+
+	pub fn previous_media(&mut self, state: &mut State) {
+		if let Some(sink) = &self.sink {
+			let current_audio = state.queue
+				.into_iter()
+				.filter(|item| item.currently_playing == false)
+				.collect();
+
+			let mut previous_audio = None;
+			
+			let mut previous_key: &String = &String::new();
+			for audio in state.index.iter() {
+				if audio.1.id == current_audio.audio_id {
+					previous_audio = state.index.get(previous_key);
+					break;
+				}
+
+				previous_key = audio.0;
+			}
+
+			if let Some(audio) = previous_audio {
+				sink.detach(); // Destroy current queue
+				
+				if let Some(output_stream) = self.output_stream {
+					self.sink = Some(Sink::connect_new(output_stream.mixer()));
+				} // Create new sink before restoring previous queue
+
+				self.add_to_queue(state, *audio); // Add the previous track to queue.
+				sink.play();
+
+				self.load_queue_from_state(state);
+			}
+
+			// sink.append(source);
+			update_currently_playing(state, -1);
+		}
+	}
+
+	pub fn add_to_queue(&self, state: &mut State, media_file: MediaFile) -> Result<(), ()> {
+		if let Ok(file) = File::open(&media_file.path) {
+			if let Ok(source) = Decoder::try_from(file) {
+				if let Some(sink) = &self.sink {
+					sink.append(source);
+					state.queue.push(QueueItem {
+						media_id: media_file.id,
+						currently_playing: false,
+					});
+
+					return Ok(());
+				}
+			} else {
+				println!("Can't add media to queue. Couldn't convert file.");
+			}
+		} else {
+			println!("Can't add media to queue. Path might be unvalid: {}", media_file.path);
+		}
+	
+		Err(())
+	}
+
+	fn load_queue_from_state(&self, state: &State) {
+		for item in state.queue.iter() {
+			
+		}
+	}
+
+	pub fn current_track_position(sink: &Sink) -> u128 {
+		sink.get_pos().as_millis()
+	}
+	
+	pub fn clear_queue(sink: &Sink) {
+		sink.clear();
+	}
+	
+	pub fn set_volume(sink: &Sink, value: f32) {
+		sink.set_volume(value);
+	}
+	
+	pub fn current_track_position_change(sink: &Sink, position: Duration) {
+		sink.try_seek(position);
+	}
+	
+	pub fn destroy_sink(sink: Sink) {
+		sink.detach();
+	}
+}
+
+fn update_currently_playing(state: &mut State, update_direction: i32) {
+	let mut index = 0;
+	let next = update_direction > 0;
+	let previous = update_direction < 0;
+	let queue_length = state.queue.len();
+	
+	for item in state.queue.iter() {
+		if item.currently_playing {
+			if next {
+				if index == queue_length {
+					state.queue[0].currently_playing = true;
+				} else {
+					state.queue[index + 1].currently_playing = true;
+				}
+			} else if previous {
+				if index == 0 {
+					state.queue[queue_length - 1].currently_playing = true
+				} else {
+					state.queue[index - 1].currently_playing = true;
+				}
+			}
+			
+			state.queue[index].currently_playing = false;
+			break
+		}
+
+		index += 1;
+	}
+}
+
+fn open_stream() -> (OutputStream, Sink) {
 	let output_stream = rodio::OutputStreamBuilder::open_default_stream()
 		.expect("Open default audio stream");
 	let sink = Sink::connect_new(output_stream.mixer());
 	(output_stream, sink)
 }
 
-// Note: The sound plays in a separate audio thread,
-// so we need to keep the main thread alive while it's playing.
-
-pub fn start_playing_audio(sink: Sink, audio_path: &Path) {
+fn start_playing_audio(sink: &Sink, audio_path: &Path) {
 	if let Ok(file) = File::open(audio_path) {
 		let source = Decoder::try_from(file).unwrap();
 		sink.append(source);
@@ -23,42 +190,14 @@ pub fn start_playing_audio(sink: Sink, audio_path: &Path) {
 	}
 }
 
-pub fn continue_audio(sink: &Sink) {
+fn continue_audio(sink: &Sink) {
 	if sink.is_paused() {
 		sink.play();
 	}
 }
 
-pub fn pause_audio(sink: &Sink) {
+fn pause_audio(sink: &Sink) {
 	if !sink.is_paused() {
 		sink.pause();
 	}
-}
-
-pub fn add_to_queue(sink: &Sink, source: Decoder<BufReader<File>>) {
-	sink.append(source);
-}
-
-pub fn current_track_position(sink: &Sink) -> u128 {
-	sink.get_pos().as_millis()
-}
-
-pub fn clear_queue(sink: &Sink) {
-	sink.clear();
-}
-
-pub fn set_volume(sink: &Sink, value: f32) {
-	sink.set_volume(value);
-}
-
-pub fn skip_to_next(sink: &Sink) {
-	sink.skip_one();
-}
-
-pub fn current_track_position_change(sink: &Sink, position: Duration) {
-	sink.try_seek(position);
-}
-
-pub fn destroy_sink(sink: Sink) {
-	sink.detach();
 }
