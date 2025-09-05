@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use custom::ErrorHandler;
 use database::{MediaFile, Source};
 
@@ -18,10 +17,39 @@ mod custom {
 }
 
 pub mod ui {
-	use crate::{logic::database::{self, Source}, AppWindow, State};
+	use crate::{logic::{database::{self, MediaFile, Source}, validate_sources}, AppWindow, State};
 	use super::{audio::MediaPlayer, source};
 
-	pub fn handle_events(app: &AppWindow) {
+	pub fn hanle_initialization(app: &AppWindow, state: &mut State) {
+		// Initialize database or restore previous session
+		{
+			if database::initialize_tables().is_ok() {
+				let mut sIndex: Vec<MediaFile> = Vec::new();
+
+				println!("Database initialized");
+				if let Ok(list) = database::get_table::<MediaFile>() {
+					sIndex.extend(list);
+					println!("Fetched most recent details: {:?}", sIndex);
+					state.index = sIndex;
+				}
+			} else {
+				println!("Couldn't create db connection for initialization")
+			}
+		}
+
+		// Update, incase something changed during initialization
+		if let Ok(read_sources) = validate_sources() {
+			println!("Checked files {:?}", &read_sources);
+			database::add_records(read_sources);
+			println!("Updated file sources");
+			if let Ok(media_list) = database::get_table::<MediaFile>() {
+				println!("Files: {:?}", media_list);
+				state.index = media_list;
+			}
+		}
+	}
+
+	pub fn handle_events(app: &AppWindow, state: &mut State) {
 		let mut player = MediaPlayer::new();
 
 		// Media elements bottom panel.
