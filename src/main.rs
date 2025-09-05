@@ -1,7 +1,7 @@
 // Prevent console window in addition to Slint window in Windows release builds when, e.g., starting the app via file manager. Ignored on other platforms.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{collections::HashMap, error::Error};
+use std::error::Error;
 use logic::{database::{self, MediaFile, QueueItem}, ui};
 
 mod logic;
@@ -12,7 +12,7 @@ slint::include_modules!();
 
 #[derive(Debug)]
 struct State {
-	index: HashMap<String, MediaFile>,
+	index: Vec<MediaFile>,
 // 	playing: Result<None, fmt::Error>,
 	queue: Vec<QueueItem>,
 // 	playlists: Vec<String>,
@@ -21,18 +21,22 @@ struct State {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-	let mut state: State;
+	let state: State;
 	
 	{ // Initialization & recover last state
 		if database::initialize_tables().is_ok() {
-			let mut sIndex: HashMap<String, MediaFile> = HashMap::new();
+			let mut sIndex: Vec<MediaFile> = Vec::new();
 
 			println!("Database initialized");
-			if let Ok(index_hashmap) = database::get_table::<MediaFile>() {
-				sIndex.extend(index_hashmap);
+			if let Ok(list) = database::get_table::<MediaFile>() {
+				sIndex.extend(list);
 				println!("Fetched most recent details: {:?}", sIndex);
 			}
 
+			state = State {
+				index: sIndex,
+				queue: Vec::new()
+			}
 		} else {
 			println!("Couldn't create db connection for initialization")
 		}
@@ -47,8 +51,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 		println!("Checked files {:?}", &read_sources);
 		database::add_records(read_sources);
 		println!("Updated file sources");
-		let media_hashmap = database::get_table::<MediaFile>()?;
-		println!("Files: {:?}", media_hashmap);
+		let media_list = database::get_table::<MediaFile>()?;
+		println!("Files: {:?}", media_list);
 	}
 
     app.run()?;

@@ -18,15 +18,17 @@ mod custom {
 }
 
 pub mod ui {
-	use crate::{logic::database::{self, Source}, AppWindow};
-	use super::source;
+	use crate::{logic::database::{self, Source}, AppWindow, State};
+	use super::{audio::MediaPlayer, source};
 
 	pub fn handle_events(app: &AppWindow) {
+		let mut player = MediaPlayer::new();
+
 		// Media elements bottom panel.
-		app.on_media_change(move |index: i32| audio_control_events::handle_media_change(index));
-		app.on_media_start(move |start: bool| audio_control_events::handle_media_start(start));
-		app.on_media_loop(move |create_loop: bool| audio_control_events::handle_media_loop(create_loop));
-		app.on_media_mix(audio_control_events::handle_media_mix);
+		// app.on_media_change(move |index: i32| audio_control_events::handle_media_change(&mut player, index));
+		// app.on_media_start(move |start: bool| audio_control_events::handle_media_start(&mut player, start, &state));
+		// app.on_media_loop(move |create_loop: bool| audio_control_events::handle_media_loop(&mut player, create_loop));
+		// app.on_media_mix(audio_control_events::handle_media_mix);
 
 		// Settings
 		app.on_new_local_source(move || {
@@ -72,16 +74,17 @@ pub mod ui {
 			println!("create_loop bool value: {}", create_loop);
 		}
 
-		pub fn handle_media_mix() {
+		pub fn handle_media_mix() {}
 
-		}
-
-		pub fn handle_add_media_queue(media_player: MediaPlayer, file_path: String, state: &State) {
-			if let Ok(()) = media_player.add_to_media_queue(&file_path) {
-				let media: &MediaFile = state.index.get(&file_path).unwrap();
-				database::add_record::<QueueItem>(QueueItem {
-					media_id: media.id
-				});
+		pub fn handle_add_media_queue(media_player: MediaPlayer, record: &MediaFile, state: &mut State) {
+			if let Ok(()) = media_player.add_to_queue(state, record) {
+				if let Some(media) = state.index
+					.iter().find(|list_item| list_item.path == record.path) {
+						database::add_record::<QueueItem>(QueueItem {
+							media_id: media.id,
+							currently_playing: false,
+						});
+					}
 			} else {
 				println!("Couldn't add to media queue");
 			}
@@ -92,7 +95,7 @@ pub mod ui {
 // Note to self: Source and Database shouldn't interact with each other. Instead create functions here
 // that utilize some functionality of source to call a function in database or vice versa.
 
-pub fn validate_sources() -> Result<HashMap<String, MediaFile>, ErrorHandler> {
-	let source_hashmap = database::get_table::<Source>()?;
-	source::validate_sources(source_hashmap)
+pub fn validate_sources() -> Result<Vec<MediaFile>, ErrorHandler> {
+	let source_list = database::get_table::<Source>()?;
+	source::validate_sources(source_list)
 }

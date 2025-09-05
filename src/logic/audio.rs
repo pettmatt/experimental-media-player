@@ -1,5 +1,5 @@
 use rodio::{self, Decoder, OutputStream, Sink};
-use std::{fs::File, path::Path, thread::current, time::Duration};
+use std::{fs::File, path::Path, time::Duration};
 use crate::State;
 
 use super::database::{MediaFile, QueueItem};
@@ -14,15 +14,19 @@ pub struct MediaPlayer {
 }
 
 impl MediaPlayer {
-	pub fn new(&self) -> Self {
+	pub fn new() -> Self {
 		Self { sink: None, output_stream: None }
 	}
 
+	fn new_sink(&mut self) {
+		if let Some(output) = &self.output_stream {
+			self.sink = Some(Sink::connect_new(output.mixer()));
+		}
+	}
+
 	pub fn media_start(&mut self, state: &State) {
-		let audio_hashmap = &state.index;
-		let audio = audio_hashmap.get(
-			"526d41262c0ce1a7_eed390b47b9242409d510068d0267ccf.webm"
-		);
+		let audio_list = &state.index;
+		let audio = audio_list.iter().find(|item| item.name == "526d41262c0ce1a7_eed390b47b9242409d510068d0267ccf.webm");
 
 		if self.sink.is_none() {
 			let (output_stream, new_sink) = open_stream();
@@ -59,42 +63,39 @@ impl MediaPlayer {
 
 	pub fn previous_media(&mut self, state: &mut State) {
 		if let Some(sink) = &self.sink {
-			let current_audio = state.queue
+			let current_audio: Vec<QueueItem> = state.queue
+				.clone()
 				.into_iter()
 				.filter(|item| item.currently_playing == false)
 				.collect();
 
-			let mut previous_audio = None;
+			// let mut previous_audio = None;
 			
-			let mut previous_key: &String = &String::new();
+			let mut index: i32 = 0;
 			for audio in state.index.iter() {
-				if audio.1.id == current_audio.audio_id {
-					previous_audio = state.index.get(previous_key);
+				if audio.id == current_audio[0].media_id {
 					break;
 				}
 
-				previous_key = audio.0;
+				index += 1;
 			}
 
-			if let Some(audio) = previous_audio {
-				sink.detach(); // Destroy current queue
-				
-				if let Some(output_stream) = self.output_stream {
-					self.sink = Some(Sink::connect_new(output_stream.mixer()));
-				} // Create new sink before restoring previous queue
+			// if let Some(audio) = previous_audio {
+			// 	// Destroy current queue
+			// 	self.destroy_sink();
+			// 	self.new_sink();
+			// 	self.add_to_queue(state, audio.clone()); // Add the previous track to queue.
+			// 	sink.play();
 
-				self.add_to_queue(state, *audio); // Add the previous track to queue.
-				sink.play();
-
-				self.load_queue_from_state(state);
-			}
+			// 	self.load_queue_from_state(state);
+			// }
 
 			// sink.append(source);
 			update_currently_playing(state, -1);
 		}
 	}
 
-	pub fn add_to_queue(&self, state: &mut State, media_file: MediaFile) -> Result<(), ()> {
+	pub fn add_to_queue(&self, state: &mut State, media_file: &MediaFile) -> Result<(), ()> {
 		if let Ok(file) = File::open(&media_file.path) {
 			if let Ok(source) = Decoder::try_from(file) {
 				if let Some(sink) = &self.sink {
@@ -138,8 +139,10 @@ impl MediaPlayer {
 		sink.try_seek(position);
 	}
 	
-	pub fn destroy_sink(sink: Sink) {
-		sink.detach();
+	pub fn destroy_sink(self) {
+		if let Some(sink) = self.sink {
+			sink.detach();
+		}
 	}
 }
 

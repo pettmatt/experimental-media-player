@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+
 use rusqlite::{Connection, ErrorCode, Row, ToSql};
 use super::custom::ErrorHandler;
 
@@ -9,7 +10,7 @@ struct SourceIndex {
 
 #[derive(Debug, Clone)]
 pub struct MediaFile {
-	pub id: i32,
+	pub id: usize,
 	pub name: String,
 	pub artist: String,
 	pub path: String,
@@ -25,7 +26,7 @@ pub struct Source {
 
 #[derive(Debug, Clone)]
 pub struct QueueItem {
-	pub media_id: i32,
+	pub media_id: usize,
 	pub currently_playing: bool,
 }
 
@@ -48,7 +49,7 @@ pub trait Instanceable {
 impl Instanceable for MediaFile {
 	fn new() -> Self {
 		Self {
-			id: -1,
+			id: 0,
 			name: "".to_string(),
 			artist: "".to_string(),
 			path: "".to_string(),
@@ -66,7 +67,7 @@ impl Instanceable for Source {
 
 impl Instanceable for QueueItem {
 	fn new() -> Self {
-		Self { media_id: -1, currently_playing: false }
+		Self { media_id: 0, currently_playing: false }
 	}
 }
 
@@ -337,11 +338,11 @@ pub fn initialize_tables() -> Result<(), ()> {
 }
 
 pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instanceable>()
-	-> Result<HashMap<String, T>, ErrorHandler>
+	-> Result<Vec<T>, ErrorHandler>
 {
 	match connect() {
 		Ok(connection) => {
-			let mut hashmap: HashMap<String, T> = HashMap::new();
+			let mut list: Vec<T> = Vec::new();
 			let instance = T::new();
 			let query = instance.get_query(SqlQueries::Select);
 			let mut statement = connection.prepare(&query)?;
@@ -352,11 +353,10 @@ pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instancea
 				})?;
 
 			for record in iter.flatten() {
-				let key = record.create_key();
-				hashmap.insert(key, record);
+				list.push(record);
 			}
 
-			Ok(hashmap)
+			Ok(list)
 		},
 		Err(error) => Err(error),
 	}
@@ -382,14 +382,13 @@ struct ErrorBody {
 }
 
 pub fn add_records<T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
-	new_records: HashMap<String, T>
+	new_records: Vec<T>
 ) {
 	if let Ok(connection) = connect() {
 		println!("Add records: {:?}", &new_records);
 		let mut result: HashMap<usize, ErrorBody> = HashMap::new();
 
-		for hash in new_records {
-			let record = hash.1;
+		for record in new_records {
 			let key = result.len();
 			let mut response = ErrorBody {
 				is_error: false,
