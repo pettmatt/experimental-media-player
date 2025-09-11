@@ -10,12 +10,12 @@ struct SourceIndex {
 
 #[derive(Debug, Clone)]
 pub struct MediaFile {
-	pub id: usize,
+	pub id: i32,
 	pub name: String,
 	pub artist: String,
 	pub path: String,
 	pub extension: String,
-	pub file_size: u64,
+	pub file_size: i32,
 }
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ pub struct Source {
 
 #[derive(Debug, Clone)]
 pub struct QueueItem {
-	pub media_id: usize,
+	pub media_id: i32,
 	pub currently_playing: bool,
 }
 

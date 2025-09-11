@@ -24,10 +24,7 @@ impl MediaPlayer {
 		}
 	}
 
-	pub fn media_start(&mut self, state: &State) {
-		let audio_list = &state.index;
-		let audio = audio_list.iter().find(|item| item.name == "526d41262c0ce1a7_eed390b47b9242409d510068d0267ccf.webm");
-
+	pub fn media_start(&mut self, audio: &MediaFile) {
 		if self.sink.is_none() {
 			let (output_stream, new_sink) = open_stream();
 			self.sink = Some(new_sink);
@@ -35,15 +32,22 @@ impl MediaPlayer {
 		}
 
 		if let Some(sink) = &self.sink {
-			continue_audio(sink);
-			
+			let audio_path = Path::new(&audio.path);
+			sink.set_volume(0.1);
+			start_playing_audio(sink, audio_path);
+		}
+	}
+
+	pub fn media_toggle(&mut self) {
+		if self.sink.is_none() {
+			return
+		}
+
+		if let Some(sink) = &self.sink {
 			if sink.is_paused() {
-				if let Some(a) = audio {
-					let audio_path = Path::new(&a.path);
-					if let Some(sink) = &self.sink {
-						start_playing_audio(sink, audio_path);
-					}
-				}
+				sink.play();
+			} else {
+				sink.pause();
 			}
 		}
 	}

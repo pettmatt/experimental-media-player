@@ -1,42 +1,29 @@
-import { HorizontalBox } from "std-widgets.slint";
+import { HorizontalBox, Button } from "std-widgets.slint";
 import { CustomButton } from "custom-elements/custom-button.slint";
+import { SlintMediaFile } from "data-flow.slint";
 
 component Item {
-	in property<{
-		id: string,
-		name: string,
-		author: string,
-		source: string,
-		image_url: string,
-		audio: {
-			id: string,
-			added: string,
-		},
-	}> data;
+	in property<SlintMediaFile> data;
 
 	CustomButton {
 		HorizontalBox {
 			Image {}
 			Text { text: root.data.name; }
-			Text { text: root.data.author; }
-			Text { text: root.data.source; }
+			Text { text: root.data.artist; }
+			Button {
+				text: "Play";
+				clicked => {
+					// media_start_specific(id);
+				}
+			}
 		}
 	}
 }
 
 export component MainList {
-	in property<[{
-		id: string,
-		name: string,
-		author: string,
-		source: string,
-		image_url: string,
-		audio: {
-			id: string,
-			added: string,
-		},
-	}]> list;
+	in property<[SlintMediaFile]> list;
 
+	// Add click event that triggers the audio to play
 	for item in list:
 		Item {
 			data: item;

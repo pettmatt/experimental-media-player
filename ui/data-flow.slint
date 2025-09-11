@@ -1,0 +1,35 @@
+export struct SlintMediaFile {
+	id: int,
+	name: string,
+	artist: string,
+	path: string,
+	extension: string,
+	file_size: int,
+}
+
+export struct SlintQueueItem {
+	media_id: int,
+	currently_playing: bool,
+}
+
+export global Palette {
+	in-out property<color> primary-text: #191b20;
+	in-out property<color> primary-background: #808597;
+}
+
+export global SlintState {
+	in-out property<[SlintMediaFile]> index;
+	in-out property<[SlintQueueItem]> queue;
+}
+
+export global SettingActions {
+	callback new_local_source();
+}
+
+export global MediaActions {
+	callback media_mix();
+	callback media_change(int);
+	callback media_start(int);
+	callback media_toggle();
+	callback media_loop();
+}

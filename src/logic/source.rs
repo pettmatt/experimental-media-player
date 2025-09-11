@@ -33,7 +33,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<MediaFile>, Error> {
 			println!("Entry_path {:?}", &entry_path);
 			let metadata = fs::metadata(&entry_path)
 				.expect("Couldn't get metadata");
-			let file_size = metadata.len();
+			let file_size = metadata.len() as i32;
 
 			let file_extension = Path::new(&entry_path)
 				.extension()
@@ -48,12 +48,12 @@ pub fn read_source(source: PathBuf) -> Result<Vec<MediaFile>, Error> {
 			};
 
 			if mime_type.is_some() {
-				let name_array: Vec<&str> = file_name.split(".").collect();
-				let audio_name = name_array[0];
+				// let name_array: Vec<&str> = file_name.split(".").collect();
+				// let audio_name = name_array[0];
 				let artist = String::from("unknown");
-				let key = format!("{}.{}", audio_name, artist);
+				// let key = format!("{}.{}", audio_name, artist);
 				let path = format!("{:?}", entry_path);
-				let id = list.len();
+				let id = list.len() as i32;
 
 				list.push(MediaFile {
 					id,
