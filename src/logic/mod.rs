@@ -95,7 +95,7 @@ pub mod ui {
 			let audio: &Option<&MediaFile> = &state_clone_1.index.iter().find(|item| item.id == id);
 
 			if let Some(media) = audio {
-				audio_control_events::handle_media_start(&mut player_clone_2, media.clone());
+				audio_control_events::handle_media_start(&mut player_clone_2, media);
 			}
 		});
 		global_media_actions.on_media_toggle(move ||

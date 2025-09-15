@@ -77,14 +77,21 @@ trait FromRow {
 
 impl FromRow for MediaFile {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-		Ok(Self {
+		let mut file = Self {
 			id: row.get("id")?,
 			name: row.get("name")?,
 			artist: row.get("artist")?,
 			extension: row.get("extension")?,
 			path: row.get("path")?,
 			file_size: row.get("file_size")?,
-		})
+		};
+
+		let mut path_array: Vec<&str> = file.path.split('"').collect();
+		path_array.remove(0);
+		path_array.remove(path_array.len() - 1);
+		file.path = path_array.concat();
+
+		Ok(file)
 	}
 }
 
@@ -355,7 +362,7 @@ pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instancea
 			for record in iter.flatten() {
 				list.push(record);
 			}
-
+			println!("(Database) - get_table: {:?}", &list);
 			Ok(list)
 		},
 		Err(error) => Err(error),
