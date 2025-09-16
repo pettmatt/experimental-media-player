@@ -1,31 +1,48 @@
-import { HorizontalBox, Button } from "std-widgets.slint";
+import { HorizontalBox, Button, ListView, VerticalBox, StandardTableView } from "std-widgets.slint";
 import { CustomButton } from "custom-elements/custom-button.slint";
-import { SlintMediaFile } from "data-flow.slint";
+import { SlintMediaFile, MediaActions as ma } from "data-flow.slint";
+import { Palette } from "style.slint";
 
-component Item {
-	in property<SlintMediaFile> data;
-
-	CustomButton {
-		HorizontalBox {
-			Image {}
-			Text { text: root.data.name; }
-			Text { text: root.data.artist; }
-			Button {
-				text: "Play";
-				clicked => {
-					// media_start_specific(id);
-				}
-			}
-		}
-	}
-}
+// component Item {
+// 	in property<SlintMediaFile> data;
+// }
 
 export component MainList {
 	in property<[SlintMediaFile]> list;
 
-	// Add click event that triggers the audio to play
-	for item in list:
-		Item {
-			data: item;
+	ListView {
+		height: parent.height;
+
+		for item in list: Rectangle {
+			TouchArea {
+				clicked => {
+					ma.media_start(item.id);
+				}
+
+				Rectangle {
+					// height: 30px;
+					background: Palette.secondary-background;
+
+					HorizontalBox {
+						alignment: start;
+
+						Image {}
+						Text { text: item.name; }
+						Text { text: item.artist; }
+						// Button {
+						// 	text: "Play";
+						// 	clicked => {
+						// 		ma.media_start(item.id);
+						// 	}
+						// }
+					}
+				}
+			}
 		}
+	}
+
+	// StandardTableView {
+	// 	columns: [{ title: "Name" }, { title: "Artist" }];
+	// 	rows: list;
+	// }
 }

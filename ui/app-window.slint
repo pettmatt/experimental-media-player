@@ -1,8 +1,8 @@
 import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Queue } from "queue.slint";
 import { SideBar } from "side-bar.slint";
 import { MainList } from "main-list.slint";
 import { MediaControllers } from "media-controllers.slint";
-import { Queue } from "queue.slint";
 import { SlintState, SettingActions, MediaActions } from "data-flow.slint";
 
 export { SlintState, SettingActions, MediaActions }
@@ -22,7 +22,12 @@ export component AppWindow inherits Window {
 		if root.width > 500px:
 			SideBar { playlists: []; y: 0; }
 
-		MainList { list: SlintState.index; min-width: root.width * 60%; }
+		MainList {
+			min-width: root.width * 60%;
+			height: root.height - 150px;
+			
+			list: SlintState.index;
+		}
 
 		if root.width > 700px:
 			Queue { y: 0; }
@@ -44,8 +49,6 @@ export component AppWindow inherits Window {
 		if root.width < 700px:
 			Queue { }
 
-		MediaControllers {
-			
-		}
+		MediaControllers {}
 	}
 }

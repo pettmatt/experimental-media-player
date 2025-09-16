@@ -1,31 +1,26 @@
-import { HorizontalBox, VerticalBox, Button } from "std-widgets.slint";
+import { HorizontalBox, VerticalBox, Button, Slider } from "std-widgets.slint";
+import { MediaActions as ma, SlintState, SlintTimeLine } from "data-flow.slint";
 
 export component MediaControllers {
-	in property<{
-		time: {
-			current: string,
-			length: string
-		}
-	}> playing;
-
-	callback mix_audio();
-	callback start(bool);
-	callback loop_audio(bool);
-	callback change_audio(int);
+	in property<SlintTimeLine> playing: SlintState.currently_playing;
 
 	VerticalBox {
 		HorizontalBox {
-			Button { text: "mix"; clicked => { mix_audio() } }
-			Button { text: "prev"; clicked => { change_audio(-1) } }
-			Button { text: "start"; clicked => { start(true) } }
-			Button { text: "next"; clicked => { change_audio(1) } }
-			Button { text: "loop"; clicked => { loop_audio(true) } }
+			Button { text: "mix"; clicked => { ma.media_mix() } }
+			Button { text: "prev"; clicked => { ma.media_change(-1) } }
+			Button { text: "start"; clicked => { ma.media_toggle() } }
+			Button { text: "next"; clicked => { ma.media_change(1) } }
+			Button { text: "loop"; clicked => { ma.media_loop() } }
 		}
 
 		HorizontalBox {
-			Text { text: root.playing.time.current; }
-			Rectangle { background: orange; }
-			Text { text: root.playing.time.length; }
+			Text { text: playing.current / 60; }
+			Slider {
+				width: 90%;
+				height: 10px;
+				value: playing.current / playing.length / 60;
+			}
+			Text { text: playing.length / 60; }
 		}
 	}
 }

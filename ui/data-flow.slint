@@ -12,14 +12,15 @@ export struct SlintQueueItem {
 	currently_playing: bool,
 }
 
-export global Palette {
-	in-out property<color> primary-text: #191b20;
-	in-out property<color> primary-background: #808597;
+export struct SlintTimeLine {
+	current: int,
+	length: int
 }
 
 export global SlintState {
 	in-out property<[SlintMediaFile]> index;
 	in-out property<[SlintQueueItem]> queue;
+	in property<SlintTimeLine> currently_playing;
 }
 
 export global SettingActions {
@@ -27,9 +28,13 @@ export global SettingActions {
 }
 
 export global MediaActions {
-	callback media_mix();
 	callback media_change(int);
 	callback media_start(int);
 	callback media_toggle();
 	callback media_loop();
+	callback media_mix();
+
+	// Media track
+	callback media_change_track_position(int);
+	callback media_get_track_position();
 }

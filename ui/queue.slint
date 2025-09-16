@@ -1,3 +1,32 @@
+import { ListView, HorizontalBox } from "std-widgets.slint";
+import { MediaActions as ma, SlintQueueItem, SlintMediaFile, SlintState } from "data-flow.slint";
+
 export component Queue {
+	in property<[SlintQueueItem]> queue;
+
 	Text { text: "Queue"; }
+
+	ListView {
+		height: parent.height;
+
+		for item in queue: Rectangle {
+			TouchArea {
+				clicked => {
+					ma.media_start(item.media_id);
+				}
+
+				Rectangle {
+					// height: 30px;
+					// background: Palette.secondary-background;
+
+					HorizontalBox {
+						alignment: start;
+
+						Text { text: SlintState.index[item.media_id].name; }
+						Text { text: SlintState.index[item.media_id].artist; }
+					}
+				}
+			}
+		}
+	}
 }
