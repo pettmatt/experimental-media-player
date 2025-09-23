@@ -4185,6 +4185,8 @@ dependencies = [
 name = "slint-rust-template"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-channel",
+ "dasp_sample",
  "native-dialog",
  "rodio",
  "rusqlite",
