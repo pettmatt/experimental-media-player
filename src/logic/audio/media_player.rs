@@ -1,6 +1,6 @@
 use rodio::{self, Decoder, OutputStream};
-use std::{fs::File, path::Path, sync::{Arc, Mutex}, time::Duration};
-use crate::State;
+use std::{fs::File, io::BufReader, path::Path, sync::{Arc, Mutex}, time::Duration};
+use crate::{logic::database::MediaFile, State};
 use super::sink::Sink;
 
 // Rodio docs: https://docs.rs/rodio/latest/rodio/
@@ -9,19 +9,19 @@ use super::sink::Sink;
 
 pub struct MediaPlayer {
 	sink: Option<Arc<Mutex<Sink>>>,
-	output_stream: Option<OutputStream>,
+	stream_handle: Option<OutputStream>,
 }
 
 impl MediaPlayer {
 	pub fn new() -> Self {
-		Self { sink: None, output_stream: None }
+		Self { sink: None, stream_handle: None }
 	}
 
-	pub fn media_start<M>(&mut self, audio: &M) {
+	pub fn start(&mut self, audio: &MediaFile) {
 		if self.sink.is_none() {
-			let (output_stream, new_sink) = open_stream();
+			let (stream_handle, new_sink) = open_stream();
 			self.sink = Some(Arc::new(Mutex::new(new_sink)));
-			self.output_stream = Some(output_stream);
+			self.stream_handle = Some(stream_handle);
 		}
 
 		if let Some(guard) = &self.sink {
@@ -32,12 +32,16 @@ impl MediaPlayer {
 			}
 		}
 
-		self.callback_after_audio_ends(|| {
-			println!("It is working");
-		});
+		// self.callback_after_audio_ends(|| {
+		// 	println!("It is working");
+		// });
 	}
 
-	pub fn media_toggle(&mut self) {
+	pub fn start_next(&mut self, audio: &MediaFile) {
+
+	}
+
+	pub fn source_toggle(&mut self) {
 		if self.sink.is_none() {
 			return
 		}
@@ -53,30 +57,31 @@ impl MediaPlayer {
 		}
 	}
 
-	pub fn media_pause(&mut self) {
+	pub fn pause(&mut self) {
 		if let Some(guard) = &self.sink {
 			if let Ok(sink) = guard.lock() {
-				pause_audio(&sink);
+				if !sink.is_paused() {
+					sink.pause();
+				}
 			}
 		}
 	}
 
-	pub fn media_change_to_specific(&mut self, index: i32) {
+	pub fn source_change_to_specific(&mut self, index: i32) {
 		if let Some(sink) = &mut self.sink {
 			// *sink.detach();
 		}
 	}
 
-	pub fn next_media(&self, state: &mut State) {
+	pub fn next(&self) {
 		if let Some(guard) = &self.sink {
 			if let Ok(sink) = guard.lock() {
 				sink.skip_one();
-				update_currently_playing(state, 1);
 			}
 		}
 	}
 
-	pub fn previous_media(&mut self, state: &mut State) {
+	pub fn previous(&mut self, state: &mut State) {
 		if let Some(sink) = &self.sink {
 			// let current_audio: Vec<QueueItem> = state.queue
 			// 	.clone()
@@ -110,7 +115,35 @@ impl MediaPlayer {
 		}
 	}
 
-	pub fn add_to_queue<M>(&self, state: &mut State, media_file: &M) -> Result<(), ()> {
+	pub fn clear_queue(&self) {
+		if let Some(stream_handle) = &self.stream_handle {
+			// stream_handle.cl
+		}
+	}
+
+	pub fn create_queue(&self, media_files: Vec<&MediaFile>) -> Result<(), ()> {
+		let _ = media_files.iter().map(|media_file| {
+			if let Some(sink) = &self.sink {
+				{
+					let guard = sink.lock().unwrap();
+					guard.clear();
+				}
+				
+				let file = File::open(&media_file.path).unwrap();
+				let source = Decoder::try_from(file).unwrap();
+					
+				if let Some(guard) = self.sink.as_ref() {
+					if let Ok(sink) = guard.lock() {
+						sink.append(source);
+					}
+				}
+			}
+		});
+
+		Ok(())
+	}
+
+	pub fn add_to_queue(&self, state: &mut State, media_file: &MediaFile) -> Result<(), ()> {
 		if let Ok(file) = File::open(&media_file.path) {
 			if let Ok(source) = Decoder::try_from(file) {
 				if let Some(guard) = &self.sink {
@@ -161,22 +194,18 @@ impl MediaPlayer {
 
 		0
 	}
-
-	pub fn clear_queue(sink: &Sink) {
-		sink.clear();
-	}
 	
 	pub fn set_volume(sink: &Sink, value: f32) {
 		sink.set_volume(value);
 	}
 	
-	pub fn destroy_sink(self) {
-		if let Some(guard) = &self.sink {
-			if let Ok(sink) = guard.lock() {
-				// sink.detach();
-			}
-		}
-	}
+	// pub fn destroy_sink(self) {
+	// 	if let Some(guard) = &self.sink {
+	// 		if let Ok(sink) = guard.lock() {
+	// 			sink.detach();
+	// 		}
+	// 	}
+	// }
 
 	pub async fn callback_after_audio_ends(&self, callback: fn()) {
 		if let Some(guard) = &self.sink {
@@ -227,10 +256,10 @@ fn update_currently_playing(state: &mut State, update_direction: i32) {
 }
 
 fn open_stream() -> (OutputStream, Sink) {
-	let output_stream = rodio::OutputStreamBuilder::open_default_stream()
+	let stream_handle = rodio::OutputStreamBuilder::open_default_stream()
 		.expect("Open default audio stream");
-	let sink = Sink::connect_new(output_stream.mixer());
-	(output_stream, sink)
+	let sink = Sink::connect_new(stream_handle.mixer());
+	(stream_handle, sink)
 }
 
 fn start_playing_audio(sink: &Sink, audio_path: &Path) {
@@ -246,17 +275,5 @@ fn start_playing_audio(sink: &Sink, audio_path: &Path) {
 		}
 	} else {
 		println!("Couldn't open audio file: {:?}", audio_path);
-	}
-}
-
-fn continue_audio(sink: &Sink) {
-	if sink.is_paused() {
-		sink.play();
-	}
-}
-
-fn pause_audio(sink: &Sink) {
-	if !sink.is_paused() {
-		sink.pause();
 	}
 }

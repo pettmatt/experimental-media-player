@@ -3,11 +3,6 @@ use std::collections::HashMap;
 use rusqlite::{Connection, ErrorCode, Row, ToSql};
 use super::custom::ErrorHandler;
 
-struct SourceIndex {
-	id: i32,
-	path: String
-}
-
 #[derive(Debug, Clone)]
 pub struct MediaFile {
 	pub id: i32,
@@ -113,15 +108,6 @@ impl FromRow for QueueItem {
 	}
 }
 
-impl FromRow for SourceIndex {
-	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-		Ok(SourceIndex {
-			id: row.get("id")?,
-			path: row.get("path")?,
-		})
-	}
-}
-
 trait CreateKey {
 	fn create_key(&self) -> String;
 }
@@ -141,12 +127,6 @@ impl CreateKey for Source {
 impl CreateKey for QueueItem {
 	fn create_key(&self) -> String {
 		self.media_id.to_string()
-	}
-}
-
-impl CreateKey for SourceIndex {
-	fn create_key(&self) -> String {
-		self.id.to_string()
 	}
 }
 

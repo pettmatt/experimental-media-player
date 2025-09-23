@@ -1,10 +1,15 @@
 // Custom sink that offers more flexible way to detect what is happening in the media player.
 // In this approach queue is handled by sink.
 
-use std::sync::mpsc::Receiver;
-use std::{sync::mpsc::Sender, time::Duration};
+use std::time::Duration;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+#[cfg(feature = "crossbeam-channel")]
+use crossbeam_channel::{Receiver, Sender};
+use dasp_sample::FromSample;
+#[cfg(not(feature = "crossbeam-channel"))]
+use std::sync::mpsc::{Receiver, Sender};
 
 use rodio::mixer::Mixer;
 // use dasp_sample::FromSample;
@@ -28,11 +33,17 @@ struct SeekOrder {
 
 impl SeekOrder {
     fn new(pos: Duration) -> (Self, Receiver<Result<(), SeekError>>) {
+        #[cfg(not(feature = "crossbeam-channel"))]
         let (tx, rx) = {
             use std::sync::mpsc;
             mpsc::channel()
         };
 
+        #[cfg(feature = "crossbeam-channel")]
+        let (tx, rx) = {
+            use crossbeam_channel::bounded;
+            bounded(1)
+        };
         (Self { pos, feedback: tx }, rx)
     }
 
@@ -191,8 +202,8 @@ impl Sink {
 	pub fn clear(&self) {
         let len = self.sound_count.load(Ordering::SeqCst) as u32;
         *self.controls.to_clear.lock().unwrap() = len;
-        self.sleep_until_end();
-        self.pause();
+        // self.sleep_until_end();
+        // self.pause();
     }
 
 	pub fn skip_one(&self) {
@@ -228,5 +239,16 @@ impl Sink {
 
 	pub fn get_pos(&self) -> Duration {
         *self.controls.position.lock().unwrap()
+    }
+}
+
+impl Drop for Sink {
+    #[inline]
+    fn drop(&mut self) {
+        self.queue_tx.set_keep_alive_if_empty(false);
+
+        if !self.detached {
+            self.controls.stopped.store(true, Ordering::Relaxed);
+        }
     }
 }

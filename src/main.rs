@@ -1,8 +1,8 @@
 // Prevent console window in addition to Slint window in Windows release builds when, e.g., starting the app via file manager. Ignored on other platforms.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::error::Error;
-use logic::{database::{MediaFile, QueueItem}, ui};
+use std::{cell::RefCell, error::Error, rc::Rc};
+use logic::{database::{MediaFile, QueueItem}, ui_events as ui};
 use slint::ComponentHandle;
 
 mod logic;
@@ -25,52 +25,21 @@ struct State {
 	// 	settings: Settings
 }
 
-impl State {
-	fn add_to_queue(&mut self, media: &MediaFile) {
-		let mut item = QueueItem {
-			media_id: media.id,
-			currently_playing: false,
-		};
-
-		if self.queue.is_empty() {
-			item.currently_playing = true;
-		}
-
-		self.queue.push(item);
-	}
-
-	fn remove_from_queue(&mut self, id: i32) {
-		let found = self.queue.iter().position(|item| item.media_id == id);
-
-		if let Some(index) = found {
-			self.queue.remove(index);
-		}
-	}
-
-	fn remove_first_from_queue(&mut self) {
-		self.queue.remove(0);
-		let first_record = &mut self.queue[0];
-		first_record.currently_playing = true;
-		// self.queue[0] = first_record.clone();
-	}
-
-	fn move_to_first_in_queue(&mut self, index: i32) {
-		println!("Queue pre {:?}", self.queue);
-		let item = self.queue.remove(index as usize);
-		self.queue.insert(0, item);
-		println!("Queue aft {:?}", self.queue);
-	}
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
 	let app = AppWindow::new()?;
 	let mut state = State::default();
 
 	ui::handle_initialization(&mut state);
 	ui::handle_passing_values(&app, &state);
-	ui::handle_events(&app, &mut state);
+	ui::handle_events(&app, &mut Rc::new(RefCell::new(state)));
 
     app.run()?;
 
     Ok(())
+}
+
+impl State {
+	pub fn find_source_for_queue_item(&self, id: i32) -> Option<&MediaFile> {
+		self.index.iter().find(|media| media.id == id)
+	}
 }
