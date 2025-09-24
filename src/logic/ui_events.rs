@@ -1,9 +1,9 @@
 use crate::{logic::{database::{self, MediaFile, Source}, validate_sources}, slint_generatedAppWindow};
 use crate::{AppWindow, SlintState, SettingActions, MediaActions, State};
+use crate::logic::queue::Queue;
 use super::{audio::media_player::MediaPlayer, source};
 use std::{rc::Rc, cell::RefCell};
-use slint::{ComponentHandle, ModelRc};
-use crate::logic::queue::Queue;
+use slint::{ComponentHandle, Model, ModelExt, ModelRc};
 
 pub fn handle_initialization(state: &mut State) {
 	// Initialize database or restore previous session
@@ -31,11 +31,23 @@ pub fn handle_initialization(state: &mut State) {
 
 pub fn handle_passing_values(app: &AppWindow, state: &State) {
 	let global_state = app.global::<SlintState>();
-	let queue_items: Vec<slint_generatedAppWindow::SlintQueueItem> = state.queue.clone()
+	let queue_items: Vec<slint_generatedAppWindow::SlintMediaFile> = state.queue.clone()
 		.into_iter()
-		.map(|q| slint_generatedAppWindow::SlintQueueItem {
-			currently_playing: q.currently_playing,
-			media_id: q.media_id,
+		.map(|q| {
+			let m = state.index
+				.iter()
+				.find(|source| source.id == q.media_id)
+				.unwrap()
+				.clone();
+
+			slint_generatedAppWindow::SlintMediaFile {
+				id: m.id,
+				artist: m.artist.into(),
+				extension: m.extension.into(),
+				file_size: m.file_size,
+				name: m.name.into(),
+				path: m.path.into(),
+			}
 		})
 		.collect();
 
@@ -75,7 +87,9 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 	let mut state_clone_1 = Rc::clone(state);
 	let mut state_clone_2 = Rc::clone(state);
 	let state_clone_3 = Rc::clone(state);
-		
+	
+	let app_weak = app.as_weak();
+
 	// Media elements bottom panel.
 	global_media_actions.on_media_start(move |id: i32| {
 		let temp_state = state_clone_1.borrow().index.clone();
@@ -83,6 +97,32 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 			.find(|item| item.id == id) {
 				state_clone_1.borrow_mut().add_to_queue(media);
 				audio_control_events::handle_media_start(&mut player_clone_1, media);
+
+				let queue_items: Vec<slint_generatedAppWindow::SlintMediaFile> = state_clone_1.borrow().queue.clone()
+					.into_iter()
+					.map(|q| {
+						let m = state_clone_1.borrow().index
+							.iter()
+							.find(|source| source.id == q.media_id)
+							.unwrap()
+							.clone();
+
+						slint_generatedAppWindow::SlintMediaFile {
+							id: m.id,
+							artist: m.artist.into(),
+							extension: m.extension.into(),
+							file_size: m.file_size,
+							name: m.name.into(),
+							path: m.path.into(),
+						}
+					})
+					.collect();
+
+				if let Some(app) = app_weak.upgrade() {
+					let queue_model = ModelRc::from(&queue_items[..]);
+					app.global::<SlintState>().set_queue(queue_model);
+					println!("(UI Events) Media queue updated ({:?})", app.global::<SlintState>().get_queue().iter().count());
+				}
 		}
 	});
 	global_media_actions.on_media_change(move |index: i32| {
