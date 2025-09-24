@@ -1,11 +1,13 @@
 use crate::State;
 use super::database::{MediaFile, QueueItem};
+use rand::prelude::*;
 
 pub trait Queue {
 	fn add_to_queue(&mut self, media: &MediaFile);
 	fn remove_from_queue(&mut self, id: i32);
 	fn progress_queue(&mut self) -> Vec<QueueItem>;
 	fn move_to_specific_index_from_current(&mut self, index: i32) -> Option<(usize, usize)>;
+	fn shuffle(&mut self);
 }
 
 impl Queue for State {
@@ -65,5 +67,15 @@ impl Queue for State {
 			}
 		
 		None
+	}
+
+	fn shuffle(&mut self) {
+		let mut random = rand::rng();
+		let length = self.queue.len();
+
+		for i in (1..length).rev() {
+			let j = random.random_range(0..=i);
+			self.queue.swap(i, j);
+		}
 	}
 }

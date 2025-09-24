@@ -83,6 +83,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 	let mut player_clone_4 = Rc::clone(&player);
 	let mut player_clone_5 = Rc::clone(&player);
 	let player_clone_6 = Rc::clone(&player);
+	let player_clone_7 = Rc::clone(&player);
 	
 	let mut state_clone_1 = Rc::clone(state);
 	let mut state_clone_2 = Rc::clone(state);
@@ -154,8 +155,10 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 	// 	let value = audio_control_events::get_current_track_position(player_clone_6);
 	// 	state_clone_3.borrow_mut();
 	// });
-	// global_media_actions.on_media_mix(move ||
-	// 	audio_control_events::handle_media_mix(player_clone_7));
+	global_media_actions.on_media_mix(move || {
+		state_clone_3.borrow_mut().shuffle();
+		audio_control_events::handle_media_mix(&player_clone_7);
+	});
 
 	// Settings
 	global_setting_actions.on_new_local_source(move || {
@@ -209,7 +212,9 @@ mod audio_control_events {
 		println!("create_loop action triggered");
 	}
 
-	pub fn handle_media_mix(media_player: Rc<RefCell<MediaPlayer>>) {}
+	pub fn handle_media_mix(media_player: &Rc<RefCell<MediaPlayer>>) {
+		
+	}
 
 	pub fn handle_add_media_queue(media_player: Rc<RefCell<MediaPlayer>>, record: &MediaFile, state: &mut State) {
 		if let Ok(()) = media_player.borrow_mut().add_to_queue(state, record) {
