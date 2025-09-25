@@ -1,4 +1,5 @@
 use std::{fmt::Error, fs, path::{Path, PathBuf}};
+use lofty::file::AudioFile;
 use native_dialog::DialogBuilder;
 use super::{custom::ErrorHandler, database::{MediaFile, Source}};
 
