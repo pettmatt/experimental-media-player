@@ -2,7 +2,7 @@ use crate::{logic::{database::{self, MediaFile, Source}, validate_sources}, slin
 use crate::{AppWindow, SlintState, SettingActions, MediaActions, State};
 use crate::logic::queue::Queue;
 use super::{audio::media_player::MediaPlayer, source};
-use std::{rc::Rc, cell::RefCell};
+use std::{cell::RefCell, rc::Rc};
 use slint::{ComponentHandle, Model, ModelExt, ModelRc};
 
 pub fn handle_initialization(state: &mut State) {
@@ -47,6 +47,8 @@ pub fn handle_passing_values(app: &AppWindow, state: &State) {
 				file_size: m.file_size,
 				name: m.name.into(),
 				path: m.path.into(),
+				duration: m.duration.into(),
+				currently_playing: m.currently_playing,
 			}
 		})
 		.collect();
@@ -60,6 +62,8 @@ pub fn handle_passing_values(app: &AppWindow, state: &State) {
 			file_size: m.file_size,
 			name: m.name.into(),
 			path: m.path.into(),
+			duration: m.duration.into(),
+			currently_playing: m.currently_playing,
 		})
 		.collect();
 
@@ -82,12 +86,13 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 	let mut player_clone_3 = Rc::clone(&player);
 	let mut player_clone_4 = Rc::clone(&player);
 	let mut player_clone_5 = Rc::clone(&player);
-	let player_clone_6 = Rc::clone(&player);
+	let mut player_clone_6 = Rc::clone(&player);
 	let player_clone_7 = Rc::clone(&player);
 	
 	let mut state_clone_1 = Rc::clone(state);
 	let mut state_clone_2 = Rc::clone(state);
 	let state_clone_3 = Rc::clone(state);
+	let state_clone_4 = Rc::clone(state);
 	
 	let app_weak = app.as_weak();
 
@@ -115,9 +120,28 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 							file_size: m.file_size,
 							name: m.name.into(),
 							path: m.path.into(),
+							duration: m.duration.into(),
+							currently_playing: m.currently_playing.into(),
 						}
 					})
 					.collect();
+
+				// let x = state_clone_1.borrow().queue.iter()
+					
+
+				// let selected_tracks: Vec<&MediaFile> = state_clone_1.borrow().queue
+				// 	.iter()
+				// 	.filter_map(|item| media_map.get(&item.media_id))
+				// 	.collect();
+
+				// selected_tracks
+				// 	.find(|item| item.currently_playing) {
+				// 		if let Some(corresponding_track) = state_clone_1.borrow().index
+				// 			.iter()
+				// 			.find(|track| track.id == queue_item.media_id) {
+				// 				state_clone_1.borrow_mut().playing.update_timeline(corresponding_track);
+				// 			};
+				// }
 
 				if let Some(app) = app_weak.upgrade() {
 					let queue_model = ModelRc::from(&queue_items[..]);
@@ -151,12 +175,13 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 	// 	audio_control_events::handle_media_loop(&mut player_clone_4));
 	// global_media_actions.on_media_change_track_position(move |position|
 		// audio_control_events::change_current_track_position(&mut player_clone_5, position));
-	// global_media_actions.on_media_get_track_position(move || {
-	// 	let value = audio_control_events::get_current_track_position(player_clone_6);
-	// 	state_clone_3.borrow_mut();
-	// });
+	global_media_actions.on_media_get_track_position(move || {
+		println!("get track triggered");
+		let value = audio_control_events::get_current_track_position(& player_clone_6);
+		state_clone_3.borrow_mut().playing.update_position(value as i32);
+	});
 	global_media_actions.on_media_mix(move || {
-		state_clone_3.borrow_mut().shuffle();
+		state_clone_4.borrow_mut().shuffle();
 		audio_control_events::handle_media_mix(&player_clone_7);
 	});
 
@@ -222,7 +247,6 @@ mod audio_control_events {
 				.iter().find(|list_item| list_item.path == record.path) {
 					database::add_record::<QueueItem>(QueueItem {
 						media_id: media.id,
-						currently_playing: false,
 					});
 				}
 		} else {
@@ -234,7 +258,7 @@ mod audio_control_events {
 		media_player.borrow_mut().change_current_track_position(position);
 	}
 
-	pub fn get_current_track_position(media_player: Rc<RefCell<MediaPlayer>>) -> u32 {
+	pub fn get_current_track_position(media_player: &Rc<RefCell<MediaPlayer>>) -> u32 {
 		media_player.borrow().get_current_track_position()
 	}
 }

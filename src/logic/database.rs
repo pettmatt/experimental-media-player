@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use rusqlite::{Connection, ErrorCode, Row, ToSql};
 use super::custom::ErrorHandler;
 
@@ -11,6 +10,8 @@ pub struct MediaFile {
 	pub path: String,
 	pub extension: String,
 	pub file_size: i32,
+	pub duration: i32,
+	pub currently_playing: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -22,7 +23,6 @@ pub struct Source {
 #[derive(Debug, Clone)]
 pub struct QueueItem {
 	pub media_id: i32,
-	pub currently_playing: bool,
 }
 
 impl std::fmt::Display for MediaFile {
@@ -50,6 +50,8 @@ impl Instanceable for MediaFile {
 			path: "".to_string(),
 			extension: "".to_string(),
 			file_size: 0,
+			duration: 0,
+			currently_playing: false,
 		}
 	}
 }
@@ -62,7 +64,7 @@ impl Instanceable for Source {
 
 impl Instanceable for QueueItem {
 	fn new() -> Self {
-		Self { media_id: 0, currently_playing: false }
+		Self { media_id: 0 }
 	}
 }
 
@@ -79,6 +81,8 @@ impl FromRow for MediaFile {
 			extension: row.get("extension")?,
 			path: row.get("path")?,
 			file_size: row.get("file_size")?,
+			duration: row.get("duration")?,
+			currently_playing: row.get("cuttently_playing")?,
 		};
 
 		let mut path_array: Vec<&str> = file.path.split('"').collect();
@@ -103,7 +107,6 @@ impl FromRow for QueueItem {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
 		Ok(Self {
 			media_id: row.get("media_id")?,
-			currently_playing: row.get("is_playing")?,
 		})
 	}
 }
@@ -291,6 +294,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 				path 		TEXT NOT NULL UNIQUE,
 				extension 	TEXT NOT NULL,
 				file_size 	INTEGER,
+				duration	INTEGER,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
 			"CREATE TABLE IF NOT EXISTS queue (

@@ -47,22 +47,30 @@ pub fn read_source(source: PathBuf) -> Result<Vec<MediaFile>, Error> {
 				_ => None
 			};
 
+			let duration = match file_extension {
+				"mp3" => read_audio_file(Path::new(&entry_path)),
+				_ => None
+			};
+
 			if mime_type.is_some() {
 				// let name_array: Vec<&str> = file_name.split(".").collect();
 				// let audio_name = name_array[0];
 				let artist = String::from("unknown");
-				// let key = format!("{}.{}", audio_name, artist);
 				let path = format!("{:?}", entry_path);
 				let id = list.len() as i32;
 
-				list.push(MediaFile {
-					id,
-					artist,
-					name: file_name,
-					extension: file_extension.to_string(),
-					path,
-					file_size,
-				});
+				if let Some(d) = duration {
+					list.push(MediaFile {
+						id,
+						artist,
+						name: file_name,
+						extension: file_extension.to_string(),
+						path,
+						file_size,
+						duration: d.as_secs_f32() as i32,
+						currently_playing: false,
+					});
+				}
 			} else {
 				println!("Unknown mime_type: {:?}", mime_type);
 				println!("Unhandled file_extension: {:?}", file_extension);
@@ -92,4 +100,13 @@ pub fn validate_sources(source_list: Vec<Source>) -> Result<Vec<MediaFile>, Erro
 	}
 
 	Ok(file_list)
+}
+
+fn read_audio_file(path: &Path) -> Option<core::time::Duration> {
+	if let Ok(file) = lofty::read_from_path(path) {
+		let duration = file.properties().duration();
+		return Some(duration);
+	}
+
+	None
 }
