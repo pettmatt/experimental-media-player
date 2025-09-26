@@ -30,7 +30,7 @@ impl Queue for State {
 		let index_map: HashMap<i32, &MediaFile> = self.index.iter().map(|item| (item.id, item)).collect();
 		let found: Option<usize> = self.queue.iter().position(|item| {
 			if let Some(track) = index_map.get(&item.media_id) {
-				return track.currently_playing;
+				return track.playing;
 			}
 
 			false
@@ -43,14 +43,14 @@ impl Queue for State {
 				{
 					let index_position = self.index.iter().position(|item| item.id == self.queue[index].media_id).unwrap();
 					if let Some(track) = self.index.get_mut(index_position) {
-						track.currently_playing = false;
+						track.playing = false;
 					}
 				}
 
 				let index_position = self.index.iter().position(|item| item.id == self.queue[index + 1].media_id).unwrap();
 
 				if let Some(track) = self.index.get_mut(index_position) {
-					track.currently_playing = true;
+					track.playing = true;
 				}
 			}
 
@@ -68,14 +68,14 @@ impl Queue for State {
 		if let Some((index, _)) = self.queue
 			.iter()
 			.enumerate()
-			.find(|(_, item)| self.index[item.media_id as usize].currently_playing) {
+			.find(|(_, item)| self.index[item.media_id as usize].playing) {
 				if (index as i32 + move_index) < self.queue.len() as i32 {
 					let sum_index = (index as i32 + move_index) as usize;
 					let media_index = self.queue[index].media_id as usize;
-					self.index[media_index].currently_playing = false;
+					self.index[media_index].playing = false;
 
 					let media_index = self.queue[sum_index].media_id as usize;
-					self.index[media_index].currently_playing = true;
+					self.index[media_index].playing = true;
 					return Some((index, sum_index));
 				}
 			}

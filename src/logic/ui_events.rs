@@ -3,7 +3,7 @@ use crate::{AppWindow, SlintState, SettingActions, MediaActions, State};
 use crate::logic::queue::Queue;
 use super::{audio::media_player::MediaPlayer, source};
 use std::{cell::RefCell, rc::Rc};
-use slint::{ComponentHandle, Model, ModelExt, ModelRc};
+use slint::{ComponentHandle, Model, ModelRc};
 
 pub fn handle_initialization(state: &mut State) {
 	// Initialize database or restore previous session
@@ -44,11 +44,11 @@ pub fn handle_passing_values(app: &AppWindow, state: &State) {
 				id: m.id,
 				artist: m.artist.into(),
 				extension: m.extension.into(),
-				file_size: m.file_size,
 				name: m.name.into(),
 				path: m.path.into(),
-				duration: m.duration.into(),
-				currently_playing: m.currently_playing,
+				duration: m.duration,
+				file_size: m.file_size,
+				playing: m.playing,
 			}
 		})
 		.collect();
@@ -59,15 +59,13 @@ pub fn handle_passing_values(app: &AppWindow, state: &State) {
 			id: m.id,
 			artist: m.artist.into(),
 			extension: m.extension.into(),
-			file_size: m.file_size,
 			name: m.name.into(),
 			path: m.path.into(),
-			duration: m.duration.into(),
-			currently_playing: m.currently_playing,
+			duration: m.duration,
+			file_size: m.file_size,
+			playing: m.playing,
 		})
 		.collect();
-
-	// let currently_playing = state.index.curre
 
 	let queue_model = ModelRc::from(&queue_items[..]);
 	let media_model = ModelRc::from(&media_items[..]);
@@ -93,6 +91,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 	let mut state_clone_2 = Rc::clone(state);
 	let state_clone_3 = Rc::clone(state);
 	let state_clone_4 = Rc::clone(state);
+	let state_clone_5 = Rc::clone(state);
 	
 	let app_weak = app.as_weak();
 
@@ -117,11 +116,11 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 							id: m.id,
 							artist: m.artist.into(),
 							extension: m.extension.into(),
-							file_size: m.file_size,
 							name: m.name.into(),
 							path: m.path.into(),
-							duration: m.duration.into(),
-							currently_playing: m.currently_playing.into(),
+							duration: m.duration,
+							file_size: m.file_size,
+							playing: m.playing,
 						}
 					})
 					.collect();
@@ -135,7 +134,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 				// 	.collect();
 
 				// selected_tracks
-				// 	.find(|item| item.currently_playing) {
+				// 	.find(|item| item.playing) {
 				// 		if let Some(corresponding_track) = state_clone_1.borrow().index
 				// 			.iter()
 				// 			.find(|track| track.id == queue_item.media_id) {
@@ -201,8 +200,8 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 
 				println!("Directory fetched correctly {:?}", source);
 				let records = source::read_source(source).expect("Couldn't fetch all files");
-				// println!("Files read correctly {:?}", records);
-				database::add_records(records);
+				database::add_records(records.clone());
+				state_clone_5.borrow_mut().merge_to_index(records);
 			},
 			None => println!("Didn't receive a path. Result should be None: {:?}", source)
 		}

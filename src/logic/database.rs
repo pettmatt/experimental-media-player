@@ -2,16 +2,16 @@ use std::collections::HashMap;
 use rusqlite::{Connection, ErrorCode, Row, ToSql};
 use super::custom::ErrorHandler;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MediaFile {
 	pub id: i32,
 	pub name: String,
 	pub artist: String,
 	pub path: String,
 	pub extension: String,
-	pub file_size: i32,
 	pub duration: i32,
-	pub currently_playing: bool,
+	pub file_size: i32,
+	pub playing: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -27,7 +27,9 @@ pub struct QueueItem {
 
 impl std::fmt::Display for MediaFile {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}, {}, {}, {}, {}", self.name, self.artist, self.path, self.extension, self.file_size)
+		write!(f, "{}, {}, {}, {}, {}, {}, {}",
+			self.name, self.artist, self.path, self.extension, self.duration, self.file_size, self.playing
+		)
 	}
 }
 
@@ -51,7 +53,7 @@ impl Instanceable for MediaFile {
 			extension: "".to_string(),
 			file_size: 0,
 			duration: 0,
-			currently_playing: false,
+			playing: false,
 		}
 	}
 }
@@ -78,11 +80,11 @@ impl FromRow for MediaFile {
 			id: row.get("id")?,
 			name: row.get("name")?,
 			artist: row.get("artist")?,
-			extension: row.get("extension")?,
 			path: row.get("path")?,
+			extension: row.get("extension")?,
 			file_size: row.get("file_size")?,
 			duration: row.get("duration")?,
-			currently_playing: row.get("cuttently_playing")?,
+			playing: row.get("playing")?,
 		};
 
 		let mut path_array: Vec<&str> = file.path.split('"').collect();
@@ -187,8 +189,8 @@ impl GetQuery for MediaFile {
 		match query {
 			SqlQueries::Insert => {
 				String::from("
-					INSERT INTO main (name, artist, path, extension, file_size)
-					VALUES (?, ?, ?, ?, ?);
+					INSERT INTO main (name, artist, path, extension, file_size, duration, playing)
+					VALUES (?, ?, ?, ?, ?, ?, ?);
 				")
 			},
 			SqlQueries::Select => String::from("SELECT * FROM main;"),
@@ -222,6 +224,8 @@ impl ToSqlParams for MediaFile {
 			&self.path as &dyn ToSql,
 			&self.extension as &dyn ToSql,
 			&self.file_size as &dyn ToSql,
+			&self.duration as &dyn ToSql,
+			&self.playing as &dyn ToSql,
 		]
 	}
 }
@@ -295,12 +299,12 @@ pub fn initialize_tables() -> Result<(), ()> {
 				extension 	TEXT NOT NULL,
 				file_size 	INTEGER,
 				duration	INTEGER,
+				playing		INTEGER NOT NULL,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
 			"CREATE TABLE IF NOT EXISTS queue (
 				id			INTEGER PRIMARY KEY AUTOINCEMENT,
 				media_id	INTEGER NOT NULL,
-				is_playing	INTEGER NOT NULL,
 				FOREIGN KEY (media_id) REFERENCES main(id),
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
@@ -376,7 +380,7 @@ pub fn add_records<T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + Ge
 	new_records: Vec<T>
 ) {
 	if let Ok(connection) = connect() {
-		println!("Add records: {:?}", &new_records);
+		println!("Adding records: {:?}", &new_records);
 		let mut result: HashMap<usize, ErrorBody> = HashMap::new();
 
 		for record in new_records {

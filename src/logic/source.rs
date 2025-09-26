@@ -69,7 +69,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<MediaFile>, Error> {
 						path,
 						file_size,
 						duration: d.as_secs_f32() as i32,
-						currently_playing: false,
+						playing: false,
 					});
 				}
 			} else {

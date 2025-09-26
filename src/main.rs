@@ -42,4 +42,20 @@ impl State {
 	pub fn find_source_for_queue_item(&self, id: i32) -> Option<&MediaFile> {
 		self.index.iter().find(|media| media.id == id)
 	}
+
+	pub fn merge_to_index(&mut self, records: Vec<MediaFile>) {
+		let merged = self.index.clone();
+    	self.index.extend(records.into_iter().filter(|item| !merged.contains(item)));
+	}
+}
+
+impl TimeLine {
+	pub fn update_timeline(&mut self, track: &MediaFile) {
+		self.length = track.duration;
+		self.current = 0;
+	}
+
+	pub fn update_position(&mut self, value: i32) {
+		self.current = value;
+	}
 }
