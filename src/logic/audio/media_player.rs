@@ -1,5 +1,5 @@
 use rodio::{self, Decoder, OutputStream};
-use std::{fs::File, io::BufReader, path::Path, sync::{Arc, Mutex}, time::Duration};
+use std::{fs::File, path::Path, sync::{Arc, Mutex}, time::Duration};
 use crate::{logic::database::MediaFile, State};
 use super::sink::Sink;
 
@@ -31,10 +31,6 @@ impl MediaPlayer {
 				start_playing_audio(&sink, audio_path);
 			}
 		}
-
-		// self.callback_after_audio_ends(|| {
-		// 	println!("It is working");
-		// });
 	}
 
 	pub fn start_next(&mut self, audio: &MediaFile) {
@@ -86,7 +82,7 @@ impl MediaPlayer {
 			// let current_audio: Vec<QueueItem> = state.queue
 			// 	.clone()
 			// 	.into_iter()
-			// 	.filter(|item| item.currently_playing == false)
+			// 	.filter(|item| item.playing == false)
 			// 	.collect();
 
 			// let mut previous_audio = None;
@@ -111,7 +107,7 @@ impl MediaPlayer {
 			// }
 
 			// sink.append(source);
-			update_currently_playing(state, -1);
+			// update_playing(state, -1);
 		}
 	}
 
@@ -151,7 +147,7 @@ impl MediaPlayer {
 						sink.append(source);
 						// state.queue.push(QueueItem {
 						// 	media_id: media_file.id,
-						// 	currently_playing: false,
+						// 	playing: false,
 						// });
 
 						return Ok(());
@@ -228,32 +224,32 @@ impl MediaPlayer {
 	}
 }
 
-fn update_currently_playing(state: &mut State, update_direction: i32) {
-	let next = update_direction > 0;
-	let previous = update_direction < 0;
-	let queue_length = state.queue.len();
+// fn update_playing(state: &mut State, update_direction: i32) {
+// 	let next = update_direction > 0;
+// 	let previous = update_direction < 0;
+// 	let queue_length = state.queue.len();
 	
-	for (index, item) in state.queue.iter().enumerate() {
-		if item.currently_playing {
-			if next {
-				if index == queue_length {
-					state.queue[0].currently_playing = true;
-				} else {
-					state.queue[index + 1].currently_playing = true;
-				}
-			} else if previous {
-				if index == 0 {
-					state.queue[queue_length - 1].currently_playing = true
-				} else {
-					state.queue[index - 1].currently_playing = true;
-				}
-			}
+// 	for (index, item) in state.queue.iter().enumerate() {
+// 		if item.playing {
+// 			if next {
+// 				if index == queue_length {
+// 					state.queue[0].playing = true;
+// 				} else {
+// 					state.queue[index + 1].playing = true;
+// 				}
+// 			} else if previous {
+// 				if index == 0 {
+// 					state.queue[queue_length - 1].playing = true
+// 				} else {
+// 					state.queue[index - 1].playing = true;
+// 				}
+// 			}
 			
-			state.queue[index].currently_playing = false;
-			break
-		}
-	}
-}
+// 			state.queue[index].playing = false;
+// 			break
+// 		}
+// 	}
+// }
 
 fn open_stream() -> (OutputStream, Sink) {
 	let stream_handle = rodio::OutputStreamBuilder::open_default_stream()
