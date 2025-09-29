@@ -4,12 +4,14 @@ import { SideBar } from "side-bar.slint";
 import { MainList } from "main-list.slint";
 import { MediaControllers } from "media-controllers.slint";
 import { SlintState, SettingActions, MediaActions } from "data-flow.slint";
+import { MobileQueue } from "mobile-queue.slint";
+import { DisplayBox } from "components/display-box.slint";
 
 export { SlintState, SettingActions, MediaActions }
 
 export component AppWindow inherits Window {
-	preferred-width: 100%;
-    preferred-height: 100%;
+	// preferred-width: 100%;
+    // preferred-height: 100%;
 
 	property<physical-length> gl-margin: 5px;
 	property<physical-length> gl-padding: 5px;
@@ -18,36 +20,41 @@ export component AppWindow inherits Window {
 		x: 0px;
 		y: 0px;
 		width: 100%;
+		height: root.height - (root.width < 700px ? 200px : 150px);
 
 		if root.width > 500px:
-			SideBar { playlists: []; y: 0; }
+			DisplayBox {
+				SideBar { y: 0; playlists: []; }
+			}
+
 
 		MainList {
-			min-width: root.width * 60%;
-			height: root.height - 150px;
-			
+			min-width: parent.width * 0.6;
+			horizontal-stretch: 1;
 			list: SlintState.index;
 		}
 
 		if root.width > 700px:
-			Queue { y: 0; }
+			DisplayBox {
+				Queue { y: 0; queue: SlintState.queue; }
+			}
 	}
 
 	vertical-view := VerticalBox {
 		x: 0px;
 		y: parent.height - self.height;
-		height: 150px;
+		height: root.width < 700px ? 200px : 150px;
+		width: 100%;
 
 		Button {
-			text: "test";
+			text: @tr("test");
 			clicked => { SettingActions.new_local_source() }
 		}
 
-		if root.width < 500px:
-			SideBar { }
+		SideBar { visible: root.width < 500px; }
 
 		if root.width < 700px:
-			Queue { }
+			MobileQueue { queue: SlintState.queue; }
 
 		MediaControllers {}
 	}

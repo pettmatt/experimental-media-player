@@ -1,48 +1,37 @@
-import { HorizontalBox, Button, ListView, VerticalBox, StandardTableView } from "std-widgets.slint";
-import { CustomButton } from "custom-elements/custom-button.slint";
-import { SlintMediaFile, MediaActions as ma } from "data-flow.slint";
+import { HorizontalBox, Button, ListView, VerticalBox, StandardTableView, ScrollView } from "std-widgets.slint";
+// import { CustomButton } from "custom-elements/custom-button.slint";
+import { SlintMediaFile, SlintQueueItem, MediaActions } from "data-flow.slint";
 import { Palette } from "style.slint";
-
-// component Item {
-// 	in property<SlintMediaFile> data;
-// }
 
 export component MainList {
 	in property<[SlintMediaFile]> list;
 
-	ListView {
-		height: parent.height;
+	ScrollView {
+		vertical-stretch: 1;
+		horizontal-stretch: 1;
+		
+		for item in list: TouchArea {
+			clicked => {
+				MediaActions.media_start(item.id);
+			}
+			
+			Rectangle {
+				height: 30px;
+				background: Palette.secondary-background;
+				
+				HorizontalBox {
+					alignment: start;
 
-		for item in list: Rectangle {
-			TouchArea {
-				clicked => {
-					ma.media_start(item.id);
-				}
-
-				Rectangle {
-					// height: 30px;
-					background: Palette.secondary-background;
-
-					HorizontalBox {
-						alignment: start;
-
-						Image {}
-						Text { text: item.name; }
-						Text { text: item.artist; }
-						// Button {
+					Text { text: item.name; }
+					Text { text: item.artist; }
+					// Button {
 						// 	text: "Play";
 						// 	clicked => {
 						// 		ma.media_start(item.id);
 						// 	}
 						// }
-					}
 				}
 			}
 		}
 	}
-
-	// StandardTableView {
-	// 	columns: [{ title: "Name" }, { title: "Artist" }];
-	// 	rows: list;
-	// }
 }
