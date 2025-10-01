@@ -13,6 +13,8 @@ slint::include_modules!();
 struct TimeLine {
 	current: i32,
 	length: i32,
+	media_index: Option<usize>,
+	queue_index: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -46,7 +48,7 @@ impl State {
 
 		let media_items = self.convert_index();
 		globals.set_index(ModelRc::from(&media_items[..]));
-		println!("(State) Index state updated.");
+		println!("(State) Index state updated. {:?}", self.index);
 	}
 
 	pub fn set_queue(&mut self, queue: Option<Vec<QueueItem>>, globals: &SlintState) {
@@ -55,8 +57,8 @@ impl State {
 		}
 
 		let media_queue = self.convert_queue();
+		println!("(State) Queue state updated. {:?} ::: {:?}", self.queue, media_queue);
 		globals.set_queue(ModelRc::from(&media_queue[..]));
-		println!("(State) Queue state updated.");
 	}
 
 	pub fn convert_index(&self) -> Vec<slint_generatedAppWindow::SlintMediaFile> {
@@ -79,8 +81,8 @@ impl State {
 		self.queue.clone()
 			.into_iter()
 			.map(|q| {
-				let media_file = self.find_source_for_queue_item(q.media_id);
-				if let Some(m) = media_file {
+				let media_file = self.find_source_by_id(q.media_id);
+				if let Some((_, m)) = media_file {
 					return slint_generatedAppWindow::SlintMediaFile {
 						id: m.id,
 						artist: m.artist.clone().into(),
@@ -107,13 +109,33 @@ impl State {
 			.collect()
 	}
 
-	pub fn find_source_for_queue_item(&self, id: i32) -> Option<&MediaFile> {
-		self.index.iter().find(|media| media.id == id)
+	pub fn find_source_by_id(&self, id: i32) -> Option<(usize, &MediaFile)> {
+		self.index.iter().enumerate().find(|(_, media)| media.id == id)
 	}
 
 	pub fn merge_to_index(&mut self, records: Vec<MediaFile>) {
 		let merged = self.index.clone();
     	self.index.extend(records.into_iter().filter(|item| !merged.contains(item)));
+	}
+
+	fn set_index_playing(&mut self, index: usize, value: bool) -> Option<()> {
+		if let Some(queue_item) = self.queue.get(index) {
+			if let Some((media_index, _)) = self.find_source_by_id(queue_item.media_id) {
+				self.index[media_index].playing = value;
+
+				if value {
+					self.playing.media_index = Some(media_index);
+					self.playing.queue_index = Some(index);
+				} else {
+					// self.playing.media_index = None;
+					// self.playing.queue_index = None;
+				}
+
+				return Some(());
+			}
+		}
+
+		None
 	}
 }
 

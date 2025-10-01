@@ -7,7 +7,7 @@ pub trait Queue {
 	fn add_to_queue(&mut self, media: &MediaFile);
 	fn remove_from_queue(&mut self, id: i32);
 	fn progress_queue(&mut self) -> Vec<QueueItem>;
-	fn move_to_specific_index_from_current(&mut self, index: i32) -> Option<(usize, usize)>;
+	fn update_playing_audio_in_queue(&mut self, index: i32) -> Option<(usize, usize)>;
 	fn shuffle(&mut self);
 }
 
@@ -64,22 +64,16 @@ impl Queue for State {
 		Vec::new()
 	}
 
-	fn move_to_specific_index_from_current(&mut self, move_index: i32) -> Option<(usize, usize)> {
-		if let Some((index, _)) = self.queue
-			.iter()
-			.enumerate()
-			.find(|(_, item)| self.index[item.media_id as usize].playing) {
-				if (index as i32 + move_index) < self.queue.len() as i32 {
-					let sum_index = (index as i32 + move_index) as usize;
-					let media_index = self.queue[index].media_id as usize;
-					self.index[media_index].playing = false;
+	fn update_playing_audio_in_queue(&mut self, offset: i32) -> Option<(usize, usize)> {
+		let index = self.playing.queue_index.unwrap();
+		let next_index = index + offset as usize;
+		// There might be cases where audio is not playing before this function is executed.
+		self.set_index_playing(index, false);
 
-					let media_index = self.queue[sum_index].media_id as usize;
-					self.index[media_index].playing = true;
-					return Some((index, sum_index));
-				}
-			}
-		
+		if self.set_index_playing(next_index, true).is_some() {
+			return Some((index, next_index));
+		}
+
 		None
 	}
 
