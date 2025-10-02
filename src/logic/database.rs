@@ -20,6 +20,22 @@ pub struct Source {
 	pub path: String,
 }
 
+struct AudioEntry {
+	pub id: i32,
+	pub added_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Playlist {
+	pub id: i32,
+	pub name: String,
+	pub sources: Vec<String>,
+	pub image_url: String,
+	pub created_at: String,
+	pub listened_at: String,
+	pub audio_list: Vec<AudioEntry>,
+}
+
 #[derive(Debug, Clone)]
 pub struct QueueItem {
 	pub media_id: i32,
@@ -36,6 +52,15 @@ impl std::fmt::Display for MediaFile {
 impl std::fmt::Display for Source {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}, {}", self.origin, self.path)
+	}
+}
+
+impl std::fmt::Display for Playlist {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f, "{}, {}", self.name, self.sources, self.image_url, 
+			self.created_at, self.listened_at, self.audio_list
+		)
 	}
 }
 
@@ -61,6 +86,20 @@ impl Instanceable for MediaFile {
 impl Instanceable for Source {
 	fn new() -> Self {
 		Self { origin: "".to_string(), path: "".to_string() }
+	}
+}
+
+impl Instanceable for Playlist {
+	fn new() -> Self {
+		Self {
+			id: 0,
+			name: "".to_string(),
+			sources: Vec::new(),
+			image_url: "".to_string(),
+			created_at: "".to_string(),
+			listened_at: "".to_string(),
+			audio_list: Vec::new<Playlist>(),
+		}
 	}
 }
 
@@ -105,6 +144,20 @@ impl FromRow for Source {
 	}
 }
 
+impl FromRow for Playlist {
+	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+		Ok(Self {
+			id: row.get("id")?,
+			name: row.get("name")?,
+			sources: row.get("sources")?,
+			image_url: row.get("image_url")?,
+			created_at: row.get("created_at")?,
+			listened_at: row.get("listened_at")?,
+			audio_list: row.get("audio_list")?,
+		})
+	}
+}
+
 impl FromRow for QueueItem {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
 		Ok(Self {
@@ -129,6 +182,12 @@ impl CreateKey for Source {
 	}
 }
 
+impl CreateKey for Playlist {
+	fn create_key(&self) -> String {
+		String::from(&self.name)
+	}
+}
+
 impl CreateKey for QueueItem {
 	fn create_key(&self) -> String {
 		self.media_id.to_string()
@@ -143,6 +202,12 @@ impl rusqlite::ToSql for MediaFile {
 }
 
 impl rusqlite::ToSql for Source {
+	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+		self.to_sql()
+	}
+}
+
+impl rusqlite::ToSql for Playlist {
 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
 		self.to_sql()
 	}
@@ -175,15 +240,6 @@ impl GetQuery for Source {
 	}
 }
 
-// impl GetQuery for SourceIndex {
-// 	fn get_query(&self, query: SqlQueries) -> String {
-// 		match query {
-// 			SqlQueries::Insert => String::from("INSERT INTO sources (origin, path) VALUES (?2);"),
-// 			SqlQueries::Select => String::from("SELECT * FROM (?1);"),
-// 		}
-// 	}
-// }
-
 impl GetQuery for MediaFile {
 	fn get_query(&self, query: SqlQueries) -> String {
 		match query {
@@ -194,6 +250,18 @@ impl GetQuery for MediaFile {
 				")
 			},
 			SqlQueries::Select => String::from("SELECT * FROM main;"),
+		}
+	}
+}
+
+impl GetQuery for Playlist {
+	fn get_query(&self, query: SqlQueries) -> String {
+		match query {
+			SqlQueries::Insert => String::from("
+				INSERT INTO playlists (name, sources, image_url, audio_list, created_at, listened_at)
+				VALUES (?, ?, ?, ?, ?, ?);
+			"),
+			SqlQueries::Select => String::from("SELECT * FROM playlists;"),
 		}
 	}
 }
@@ -235,6 +303,19 @@ impl ToSqlParams for Source {
 		vec![
 			&self.origin as &dyn ToSql,
 			&self.path as &dyn ToSql,
+		]
+	}
+}
+
+impl ToSqlParams for Playlist {
+	fn to_sql_params(&self) -> Vec<&dyn ToSql> {
+		vec![
+			&self.name as &dyn ToSql,
+			&self.sources as &dyn ToSql,
+			&self.image_url as &dyn ToSql,
+			&self.created_at as &dyn ToSql,
+			&self.listened_at as &dyn ToSql,
+			&self.audio_list as &dyn ToSql,
 		]
 	}
 }
@@ -289,8 +370,6 @@ pub fn initialize_tables() -> Result<(), ()> {
 				path 		TEXT NOT NULL UNIQUE,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			// source_id 	INTEGER,
-			// FOREIGN KEY (source) REFERENCES sources(id)
 			"CREATE TABLE IF NOT EXISTS main (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				name 		TEXT NOT NULL,
@@ -305,14 +384,23 @@ pub fn initialize_tables() -> Result<(), ()> {
 			"CREATE TABLE IF NOT EXISTS queue (
 				id			INTEGER PRIMARY KEY AUTOINCEMENT,
 				media_id	INTEGER NOT NULL,
-				FOREIGN KEY (media_id) REFERENCES main(id),
-				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
+				created 	DATETIME DEFAULT (datetime('now', 'localtime')),
+				FOREIGN KEY (media_id) REFERENCES main(id)
 			);",
-			"CREATE UNIQUE INDEX IF NOT EXISTS path_index ON main(path);",
-			"CREATE INDEX IF NOT EXISTS name_index ON main(name);",
-			"CREATE INDEX IF NOT EXISTS author_index ON main(author);",
+			"CREATE TABLE IF NOT EXISTS playlist (
+				id			INTEGER PRIMARY KEY AUTOINCEMENT,
+				name		TEXT NOT NULL,
+				sources		TEXT,
+				image_url	TEXT,
+				audio_list	TEXT,
+				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
+				listened_at	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
+			// "CREATE UNIQUE INDEX IF NOT EXISTS path_index ON main(path);",
+			// "CREATE INDEX IF NOT EXISTS name_index ON main(name);",
+			// "CREATE INDEX IF NOT EXISTS author_index ON main(author);",
 			// "CREATE INDEX IF NOT EXISTS source_index ON main(source);",
-			"CREATE INDEX IF NOT EXISTS sources_index ON sources(path);"
+			// "CREATE INDEX IF NOT EXISTS sources_index ON sources(path);"
 		];
 
 		let mut index = 0;
@@ -350,6 +438,7 @@ pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instancea
 			for record in iter.flatten() {
 				list.push(record);
 			}
+
 			println!("(Database) - get_table: {:?}", &list);
 			Ok(list)
 		},

@@ -53,10 +53,10 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 	let state_clone_3 = Rc::clone(state);
 	let state_clone_4 = Rc::clone(state);
 	let state_clone_5 = Rc::clone(state);
+	let state_clone_6 = Rc::clone(state);
 	
 	let weak_app = app.as_weak();
-	let app_clone_1 = weak_app.clone();
-	let app_clone_2 = weak_app.clone();
+	let app_clone = weak_app.clone();
 
 	// Media elements bottom panel.
 	global_media_actions.on_media_start(move |id: i32| {
@@ -66,7 +66,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 				audio_control_events::handle_media_start(&mut player_clone_1, media);
 				state_clone_1.borrow_mut().add_to_queue(media);
 
-				if let Some(app) = app_clone_1.upgrade() {
+				if let Some(app) = app_clone.upgrade() {
 					state_clone_1.borrow_mut().set_queue(None, &app.global::<SlintState>());
 					state_clone_1.borrow_mut().playing.media_index = Some(index);
 
@@ -83,7 +83,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 		let queue_result = state_clone_2
 			.borrow_mut().update_playing_audio_in_queue(index);
 
-		if let Some(app) = app_clone_2.upgrade() {
+		if let Some(app) = app_clone.upgrade() {
 			state_clone_2.borrow_mut().set_queue(None, &app.global::<SlintState>());
 		}
 
@@ -142,6 +142,12 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 				state_clone_5.borrow_mut().merge_to_index(records);
 			},
 			None => println!("Didn't receive a path. Result should be None: {:?}", source)
+		}
+	});
+
+	global_media_actions.on_add_to_playlist(move |playlist_id: i32, media_id: i32| {
+		if let Some(app) = app_clone.upgrade() {
+			state_clone_6.borrow_mut().add_playlist(playlist_id, media_id, &app.global::<SlintState>());
 		}
 	});
 }
