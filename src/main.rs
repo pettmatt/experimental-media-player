@@ -1,8 +1,8 @@
 // Prevent console window in addition to Slint window in Windows release builds when, e.g., starting the app via file manager. Ignored on other platforms.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{cell::RefCell, error::Error, rc::Rc};
-use logic::{database::{MediaFile, QueueItem}, ui_events as ui};
+use std::{cell::RefCell, error::Error, rc::Rc, time::{UNIX_EPOCH}};
+use logic::{database::{MediaFile, QueueItem, Playlist, AudioEntry}, ui_events as ui};
 use slint::{ComponentHandle, ModelRc, SharedString};
 
 mod logic;
@@ -22,7 +22,7 @@ struct State {
 	index: Vec<MediaFile>,
 	queue: Vec<QueueItem>, // Because Rodio doesn't offer frexible way to interact with the queue, we're managing by deleting the queue, whenever we want to make a change.
 	playing: TimeLine,
-	// 	playlists: Vec<String>,
+	playlists: Vec<Playlist>,
 	// 	sources: Vec<String>,
 	// 	settings: Settings,
 }
@@ -61,6 +61,45 @@ impl State {
 		globals.set_queue(ModelRc::from(&media_queue[..]));
 	}
 
+	fn set_new_playlist(&mut self, name: String, image_url: String, globals: &SlintState) {
+		let new_entry = Playlist {
+			id: 0,
+			name,
+			sources: Vec::new(),
+			image_url,
+			created_at: "".to_string(),
+			listened_at: "".to_string(),
+			audio_list: Vec::new(),
+			_audio_list_string: String::new(),
+			_sources_string: String::new(),
+		};
+
+		self.playlists.push(new_entry);
+		let playlists: Vec<SlintPlaylist> = self.convert_playlist_to_slint();
+		globals.set_playlist(ModelRc::from(&playlists[..]));
+	}
+
+	fn add_to_playlist(&mut self, playlist_id: i32, media_id: i32, globals: &SlintState) {
+		let playlist: Option<&mut Playlist> = self.playlists.iter_mut().find(|playlist|
+			playlist.id == playlist_id);
+
+		if let Some(p) = playlist {
+			let now = std::time::SystemTime::now();
+			let since = now.duration_since(UNIX_EPOCH);
+
+			if let Ok(duration) = since {
+				let new_entry = AudioEntry {
+					id: media_id,
+					added_at: format!("{}", duration.as_secs()),
+				};
+				p.audio_list.push(new_entry);
+			}
+
+			let playlists: Vec<SlintPlaylist> = self.convert_playlist_to_slint();
+			globals.set_playlist(ModelRc::from(&playlists[..]));
+		};
+	}
+
 	pub fn convert_index(&self) -> Vec<slint_generatedAppWindow::SlintMediaFile> {
 		self.index.clone()
 			.into_iter()
@@ -76,6 +115,8 @@ impl State {
 			})
 			.collect()
 	}
+
+
 
 	pub fn convert_queue(&self) -> Vec<slint_generatedAppWindow::SlintMediaFile> {
 		self.queue.clone()
@@ -109,6 +150,24 @@ impl State {
 			.collect()
 	}
 
+	pub fn convert_playlist_to_slint(&self) -> Vec<slint_generatedAppWindow::SlintPlaylist> {
+		self.playlists
+			.clone()
+			.into_iter()
+			.map(|p| {
+				slint_generatedAppWindow::SlintPlaylist {
+					id: p.id,
+					name: SharedString::from(p.name),
+					sources: convert_to_slint_model(p.sources),
+					image_url: SharedString::from(p.image_url),
+					created_at: SharedString::from(p.created_at),
+					listened_at: SharedString::from(p.listened_at),
+					audio_list: convert_to_slint_model(p.audio_list),
+				}
+			})
+			.collect()
+	}
+
 	pub fn find_source_by_id(&self, id: i32) -> Option<(usize, &MediaFile)> {
 		self.index.iter().enumerate().find(|(_, media)| media.id == id)
 	}
@@ -126,9 +185,6 @@ impl State {
 				if value {
 					self.playing.media_index = Some(media_index);
 					self.playing.queue_index = Some(index);
-				} else {
-					// self.playing.media_index = None;
-					// self.playing.queue_index = None;
 				}
 
 				return Some(());
@@ -137,6 +193,20 @@ impl State {
 
 		None
 	}
+}
+
+impl From<AudioEntry> for (SharedString, i32) {
+    fn from(entry: AudioEntry) -> Self {
+        (SharedString::from(entry.added_at), entry.id)
+    }
+}
+
+fn convert_to_slint_model<T, E>(vec: Vec<T>) -> ModelRc<E>
+where
+	E: From<T> + Clone + 'static 
+{
+	let slint_vec: Vec<E> = vec.into_iter().map(|item| E::from(item)).collect();
+    ModelRc::new(slint::VecModel::from(slint_vec))
 }
 
 impl TimeLine {
