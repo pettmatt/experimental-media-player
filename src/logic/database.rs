@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use rusqlite::{Connection, ErrorCode, Row, ToSql};
+use serde::{Deserialize, Serialize};
 use super::custom::ErrorHandler;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -20,12 +21,13 @@ pub struct Source {
 	pub path: String,
 }
 
-struct AudioEntry {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioEntry {
 	pub id: i32,
 	pub added_at: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Playlist {
 	pub id: i32,
 	pub name: String,
@@ -34,6 +36,8 @@ pub struct Playlist {
 	pub created_at: String,
 	pub listened_at: String,
 	pub audio_list: Vec<AudioEntry>,
+	pub _sources_string: String,
+	pub _audio_list_string: String,
 }
 
 #[derive(Debug, Clone)]
@@ -58,7 +62,7 @@ impl std::fmt::Display for Source {
 impl std::fmt::Display for Playlist {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(
-			f, "{}, {}", self.name, self.sources, self.image_url, 
+			f, "{}, {:?}, {}, {}, {}, {:?}", self.name, self.sources, self.image_url, 
 			self.created_at, self.listened_at, self.audio_list
 		)
 	}
@@ -98,7 +102,9 @@ impl Instanceable for Playlist {
 			image_url: "".to_string(),
 			created_at: "".to_string(),
 			listened_at: "".to_string(),
-			audio_list: Vec::new<Playlist>(),
+			audio_list: Vec::new(),
+			_audio_list_string: String::new(),
+			_sources_string: String::new()
 		}
 	}
 }
@@ -146,14 +152,19 @@ impl FromRow for Source {
 
 impl FromRow for Playlist {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+		let sources: String = row.get("sources")?;
+		let audio_list: String = row.get("audio_list")?;
+
 		Ok(Self {
 			id: row.get("id")?,
 			name: row.get("name")?,
-			sources: row.get("sources")?,
+			sources: serde_json::from_str(&sources).unwrap_or_default(),
 			image_url: row.get("image_url")?,
 			created_at: row.get("created_at")?,
 			listened_at: row.get("listened_at")?,
-			audio_list: row.get("audio_list")?,
+			audio_list: serde_json::from_str(&audio_list).unwrap_or_default(),
+			_sources_string: String::new(),
+			_audio_list_string: String::new()
 		})
 	}
 }
@@ -311,11 +322,11 @@ impl ToSqlParams for Playlist {
 	fn to_sql_params(&self) -> Vec<&dyn ToSql> {
 		vec![
 			&self.name as &dyn ToSql,
-			&self.sources as &dyn ToSql,
+			&self._sources_string as &dyn ToSql,
 			&self.image_url as &dyn ToSql,
 			&self.created_at as &dyn ToSql,
 			&self.listened_at as &dyn ToSql,
-			&self.audio_list as &dyn ToSql,
+			&self._audio_list_string as &dyn ToSql,
 		]
 	}
 }
@@ -325,6 +336,31 @@ impl ToSqlParams for QueueItem {
 		vec![
 			&self.media_id as &dyn ToSql,
 		]
+	}
+}
+
+pub trait Convertable {
+	fn convert_to_string(&mut self);
+}
+
+impl Convertable for Source {
+	fn convert_to_string(&mut self) {}
+}
+
+impl Convertable for MediaFile {
+	fn convert_to_string(&mut self) {}
+}
+
+impl Convertable for QueueItem {
+	fn convert_to_string(&mut self) {}
+}
+
+impl Convertable for Playlist {
+	fn convert_to_string(&mut self) {
+		self._sources_string = serde_json::to_string(&self.sources)
+			.unwrap_or(String::new());
+		self._audio_list_string = serde_json::to_string(&self._audio_list_string)
+			.unwrap_or(String::new());
 	}
 }
 
@@ -465,14 +501,15 @@ struct ErrorBody {
 	message: Result<usize, rusqlite::Error>,
 }
 
-pub fn add_records<T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
+pub fn add_records<T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams + Convertable>(
 	new_records: Vec<T>
 ) {
 	if let Ok(connection) = connect() {
 		println!("Adding records: {:?}", &new_records);
 		let mut result: HashMap<usize, ErrorBody> = HashMap::new();
 
-		for record in new_records {
+		for mut record in new_records {
+			record.convert_to_string();
 			let key = result.len();
 			let mut response = ErrorBody {
 				is_error: false,
