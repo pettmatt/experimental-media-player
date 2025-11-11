@@ -1,0 +1,9 @@
+[
+	{
+		"url": "https://bandcamp.com/",
+		"paths": {
+			"auth": "oauth_token"
+		},
+		"headers": {}
+	}
+]
