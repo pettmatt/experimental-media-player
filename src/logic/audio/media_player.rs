@@ -176,7 +176,7 @@ impl MediaPlayer {
 	pub fn change_current_track_position(&mut self, position: Duration) {
 		if let Some(guard) = &self.sink {
 			if let Ok(sink) = guard.lock() {
-				sink.try_seek(position);
+				let _ = sink.try_seek(position);
 			}
 		}
 	}
@@ -190,11 +190,15 @@ impl MediaPlayer {
 
 		0
 	}
-	
-	pub fn set_volume(sink: &Sink, value: f32) {
-		sink.set_volume(value);
+
+	pub fn set_volume(&self, value: f32) {
+		if let Some(sink) = &self.sink {
+			if let Ok(guard) = sink.lock() {
+				guard.set_volume(value);
+			}
+		}
 	}
-	
+
 	// pub fn destroy_sink(self) {
 	// 	if let Some(guard) = &self.sink {
 	// 		if let Ok(sink) = guard.lock() {
@@ -223,33 +227,6 @@ impl MediaPlayer {
 		}
 	}
 }
-
-// fn update_playing(state: &mut State, update_direction: i32) {
-// 	let next = update_direction > 0;
-// 	let previous = update_direction < 0;
-// 	let queue_length = state.queue.len();
-	
-// 	for (index, item) in state.queue.iter().enumerate() {
-// 		if item.playing {
-// 			if next {
-// 				if index == queue_length {
-// 					state.queue[0].playing = true;
-// 				} else {
-// 					state.queue[index + 1].playing = true;
-// 				}
-// 			} else if previous {
-// 				if index == 0 {
-// 					state.queue[queue_length - 1].playing = true
-// 				} else {
-// 					state.queue[index - 1].playing = true;
-// 				}
-// 			}
-			
-// 			state.queue[index].playing = false;
-// 			break
-// 		}
-// 	}
-// }
 
 fn open_stream() -> (OutputStream, Sink) {
 	let stream_handle = rodio::OutputStreamBuilder::open_default_stream()

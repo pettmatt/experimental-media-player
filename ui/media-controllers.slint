@@ -1,16 +1,54 @@
 import { HorizontalBox, VerticalBox, Button, Slider } from "std-widgets.slint";
-import { MediaActions as ma, SlintState, SlintTimeLine } from "data-flow.slint";
+import { MediaActions, SlintState, SlintTimeLine } from "data-flow.slint";
+import { VolumeSlider } from "components/volume-slider.slint";
 
 export component MediaControllers {
-	in property<SlintTimeLine> playing: SlintState.currently_playing;
+	in property<SlintTimeLine> playing;
+
+	Timer {
+		property<int> count: 0;
+		interval: 1000ms;
+		running: SlintState.timeline.length > 0
+			? true
+			: false;
+		triggered() => {
+			MediaActions.media_get_track_position();
+		}
+	}
 
 	VerticalBox {
 		HorizontalBox {
-			Button { text: "mix"; clicked => { ma.media_mix() } }
-			Button { text: "prev"; clicked => { ma.media_change(-1) } }
-			Button { text: "start"; clicked => { ma.media_toggle() } }
-			Button { text: "next"; clicked => { ma.media_change(1) } }
-			Button { text: "loop"; clicked => { ma.media_loop() } }
+			Button { text: @tr("mix"); clicked => { MediaActions.media_mix() } }
+			Button { text: @tr("prev"); clicked => { MediaActions.media_change(-1) } }
+			Button { text: @tr("start"); clicked => { MediaActions.media_toggle() } }
+			Button { text: @tr("next"); clicked => { MediaActions.media_change(1) } }
+			Button { text: @tr("loop"); clicked => { MediaActions.media_loop() } }
+			Button { text: @tr("volume"); clicked => { MediaActions.media_loop() } }
+			Rectangle {
+				width: 25px;
+				height: 25px;
+				background: Colors.pink;
+
+				ta := TouchArea {
+					changed has-hover => {
+						if self.has-hover {
+							vs.visible = true;
+						} else {
+							vs.visible = false;
+						}
+					}
+					height: vs.visible
+						? parent.height + vs.height
+						: parent.height;
+				}
+
+				vs := VolumeSlider {
+					y: parent.y - parent.height;
+					settings: SlintState.settings;
+				}
+
+				// if ta.has-hover: 
+			}
 		}
 
 		HorizontalBox {

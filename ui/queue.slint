@@ -2,21 +2,27 @@ import { ListView, HorizontalBox } from "std-widgets.slint";
 import { MediaActions as ma, SlintMediaFile, SlintMediaFile, SlintState } from "data-flow.slint";
 import { Palette } from "style.slint";
 
-export component Queue {
-	Text { text: "Queue"; }
 
-	for item in SlintState.queue: Text {
+export component Queue {
+	accessible-role: none;
+	accessible-expandable: true;
+
+	in property<[SlintMediaFile]> queue;
+
+	Text { text: @tr("Queue"); }
+
+	for item in queue: Text {
 		text: item.id;
 	}
 
 	ListView {
 		height: parent.height;
 		
-		for item in SlintState.queue: Rectangle {
+		for item in queue: Rectangle {
 			background: pink;
-			height: 30px;
+			// height: 30px;
 
-			Text { text: "test text"; }
+			Text { text: @tr("test text"); }
 			TouchArea {
 				clicked => {
 					ma.media_start(item.id);

@@ -22,11 +22,9 @@ export component AppWindow inherits Window {
 		width: 100%;
 		height: root.height - (root.width < 700px ? 200px : 150px);
 
-		if root.width > 500px:
-			DisplayBox {
-				SideBar { y: 0; playlists: []; }
-			}
-
+		// if root.width > 500px: DisplayBox {
+		// 	SideBar { y: 0; list: SlintState.playlist; }
+		// }
 
 		MainList {
 			min-width: parent.width * 0.6;
@@ -34,10 +32,9 @@ export component AppWindow inherits Window {
 			list: SlintState.index;
 		}
 
-		if root.width > 700px:
-			DisplayBox {
-				Queue { y: 0; queue: SlintState.queue; }
-			}
+		if root.width > 700px: DisplayBox {
+			Queue { y: 0; queue: SlintState.queue; }
+		}
 	}
 
 	vertical-view := VerticalBox {
@@ -53,9 +50,12 @@ export component AppWindow inherits Window {
 
 		SideBar { visible: root.width < 500px; }
 
-		if root.width < 700px:
-			MobileQueue { queue: SlintState.queue; }
+		if root.width < 700px: MobileQueue {
+			queue: SlintState.queue;
+		}
 
-		MediaControllers {}
+		MediaControllers {
+			playing: SlintState.timeline;
+		}
 	}
 }

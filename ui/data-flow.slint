@@ -5,11 +5,12 @@ export struct SlintMediaFile {
 	path: string,
 	extension: string,
 	file_size: int,
+	duration: int,
+	playing: bool,
 }
 
 export struct SlintQueueItem {
 	media_id: int,
-	currently_playing: bool,
 }
 
 export struct SlintTimeLine {
@@ -17,10 +18,29 @@ export struct SlintTimeLine {
 	length: int
 }
 
+export struct SlintSettings {
+	volume_preset: int,
+}
+
+export struct SlintPlaylist {
+	id: int,
+	name: string,
+	sources: [string],
+	image_url: string,
+	created_at: string,
+	listened_at: string,
+	audio_list: [{
+		id: int,
+		added_at: string,
+	}],
+}
+
 export global SlintState {
-	in-out property<[SlintMediaFile]> index;
-	in-out property<[SlintMediaFile]> queue;
-	in property<SlintTimeLine> currently_playing;
+	in property<[SlintMediaFile]> index;
+	in property<[SlintMediaFile]> queue;
+	in property<[SlintPlaylist]> playlist;
+	in property<SlintTimeLine> timeline;
+	in property<SlintSettings> settings;
 }
 
 export global SettingActions {
@@ -33,8 +53,12 @@ export global MediaActions {
 	callback media_toggle();
 	callback media_loop();
 	callback media_mix();
-
+	callback add_to_playlist(int, int);
+	
 	// Media track
 	callback media_change_track_position(int);
 	callback media_get_track_position();
+	callback media_change_volume(int);
 }
+
+export enum MainView { index, playlist, queue, artist, online_source_result }

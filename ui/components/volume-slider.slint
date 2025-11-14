@@ -1,0 +1,10 @@
+import { Slider } from "std-widgets.slint";
+import { SlintSettings } from "../data-flow.slint";
+
+export component VolumeSlider inherits Slider {
+	in property<SlintSettings> settings;
+
+	orientation: Orientation.vertical;
+	width: 50px;
+	value: settings.volume_preset;
+}
