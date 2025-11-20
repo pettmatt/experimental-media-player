@@ -1,9 +1,21 @@
 [
-	{
-		"url": "https://bandcamp.com/",
-		"paths": {
-			"auth": "oauth_token"
-		},
-		"headers": {}
-	}
+  {
+    "url": "https://accounts.spotify.com/api",
+    "paths": {
+      "artist": {
+        "path": "/v1/artists/",
+        "headers": [{ "Content-Type": "application/x-www-form-urlencoded" }],
+        "body": [{ "Authorization": "BEARER_TOKEN" }]
+      },
+      "auth": {
+        "path": "/token",
+        "headers": [{ "Content-Type": "application/x-www-form-urlencoded" }],
+        "body": [
+          { "grant_type": "client_credentials" },
+          { "client_id": "ENV" },
+          { "client_secret": "ENV" }
+        ]
+      }
+    }
+  }
 ]

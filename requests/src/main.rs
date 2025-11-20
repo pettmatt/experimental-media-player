@@ -1,105 +1,110 @@
-use hyper::{header, Request, Uri};
-use hyper::{Client, Uri};
+use serde::Deserialize;
 use serde_json::Value;
+use std::{collections::HashMap, path::Path};
 use tokio;
 
+type CResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let apis: Vec<Api> = fetch_apis("requests.json");
-    let mut client = hyper::Client::new();
-    let mut responses = Vec::new();
+async fn main() -> CResult<()> {
+    let apis = fetch_apis("./src/requests.json").unwrap();
 
-    for api in apis {}
+    for api in &apis {}
 
-    println!("Hello responses: {:?}", responses);
+    println!("Hello apis: {:?}", &apis);
     Ok(())
 }
 
-async fn fetch_url(client: Client, url: Uri) -> Result {
-    let res = client.get(url).await?;
-    let body = hyper::body::to_bytes(res.into_body()).await?;
-    Ok(body)
-}
-
-fn fetch_apis(path: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
-    use std::fs;
-    let contents = fs::read_to_string(path)?;
+fn fetch_apis(path_str: &str) -> CResult<Vec<Api>> {
+    let path = Path::new(path_str);
+    let contents = std::fs::read_to_string(path)?;
     let json: Value = serde_json::from_str(&contents)?;
-    let list = Vec::new();
+    let list: Vec<Api> = Vec::new();
 
-    for object in json {
+    println!("JSON:");
+    for object in json.as_array().unwrap() {
+        println!("{:?}", object);
         let mut api = Api {
-            url: object.url,
-            headers: std::collections::HashMap::new(),
+            url: String::from(object.url),
+            paths: HashMap::new(),
         };
 
-        for h in object.headers {
-            api.headers.set(h.0, h.1);
-        }
+        for p in object.paths {
+            let mut path = ApiPath {
+                path: String::from(p.path),
+                headers: http::header::HeaderMap::new(),
+                body_parameters: HashMap::new(),
+            };
 
-        list.push(api)
+            for h in p.headers {
+                api.headers.insert(h.0, h.1);
+            }
+
+            for bp in p.body {
+                api.body_parameters.insert(bp.0, bp.1);
+            }
+
+            list.push(api)
+        }
     }
 
     Ok(list)
 }
 
-enum RequestMethod {
-    GET,
-    POST,
+#[derive(Debug, Deserialize)]
+struct ApiPath {
+    path: String,
+    #[serde(deserialize_with = "deserialize_header_map")]
+    headers: http::header::HeaderMap,
+    body_parameters: HashMap<String, String>,
 }
 
-struct Api<'a> {
-    url: &'a str,
-    headers: std::collections::HashMap<&'a str, &'a str>,
-    // body: hyper::ffi::hyper_body,
+impl<'a> std::fmt::Display for ApiPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Path {{ path: {}, headers: {:?}, body_parameters: {:?} }}",
+            self.path, self.headers, self.body_parameters
+        )
+    }
 }
 
-impl Api<'_> {
-    async fn default_request(&self, method: RequestMethod) -> Request {
-        let uri = &self.url.parse::<Uri>()?;
-        let authority = uri.authority().unwrap().clone();
+#[derive(Debug, Deserialize)]
+struct Api {
+    url: String,
+    paths: HashMap<String, ApiPath>,
+}
 
-        let mut request = Request::builder()
-            .header(header::HOST, authority.as_str())
+impl Api {
+    async fn default_request(&self, subpath: &ApiPath) -> CResult<reqwest::Response> {
+        let client = reqwest::Client::new();
+        let response = client
+            .post(format!("{}{}", &self.url, subpath))
+            .form(&subpath.body_parameters)
             .header("content-type", "application/json")
-            .uri(uri)
-            .body(Empty::<Bytes>::new())?;
+            .headers(subpath.headers.clone())
+            .send()
+            .await?;
 
-        match method {
-            RequestMethod::GET => request.method(hyper::Method::GET),
-            RequestMethod::POST => request.method(hyper::Method::POST),
-            _ => panic!("Unsupported method argument '{:?}' passed", method),
-        }
-
-        request
+        println!("Request response {:?}", response);
+        Ok(response)
     }
+}
 
-    fn add_headers(&mut self, request: Request<T>) -> Request<T> {
-        for h in &self.headers {
-            request.header(h.0, h.1)?;
-        }
+fn deserialize_header_map<'de, D>(deserializer: D) -> Result<http::header::HeaderMap, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let map: HashMap<String, String> = HashMap::deserialize(deserializer)?;
 
-        request
-    }
-
-    fn make_request(&self) {
-        let request = hyper::Request::builder()
-            .method(hyper::Method::POST)
-            .header("content-type", "application/json")
-            .uri(self.url)
-            .body(Body::empty())?;
-
-        for h in self.headers {
-            request.header(h.0, h.1)?;
-        }
-
-        let response = client.request(request).await?;
-        let body = response.into_body();
-        let mut data = null;
-
-        while let Some(chunk) = body.data().await {
-            let bytes = chunk.expect("Body chunk");
-            responses.push(bytes);
+    let mut header_map = http::header::HeaderMap::new();
+    for (key, value) in map {
+        if let (Ok(header_name), Ok(header_value)) = (
+            http::header::HeaderName::from_bytes(key.as_bytes()),
+            http::header::HeaderValue::from_str(&value),
+        ) {
+            header_map.insert(header_name, header_value);
         }
     }
+    Ok(header_map)
 }
