@@ -22,17 +22,16 @@
 				"path": "/authorize?",
 				"path-parameters": {
 					"response_type": "code",
-					"client_id": "client_id",
-					"scope": "scope",
-					"redirect_uri": "redirect_uri"
+					"client_id": "CLIENT_ID",
+					"scope": "user-read-private, user-read-email",
+					"redirect_uri": "REDIRECT_URI"
 				},
 				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
 				"body": {
 					"grant_type": "client_credentials",
 					"client_id": "ENV",
 					"client_secret": "ENV"
-				},
-				"scope": ["user-read-private", "user-read-email"]
+				}
 			}
 		}
 	}
