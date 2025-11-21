@@ -1,0 +1,39 @@
+[
+	{
+		"url": "https://accounts.spotify.com/api",
+		"paths": {
+			"artist": {
+				"path": "/v1/artists/",
+				"path-parameters": {},
+				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
+				"body": { "Authorization": "BEARER_TOKEN" }
+			},
+			"auth-token": {
+				"path": "/token",
+				"path-parameters": {},
+				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
+				"body": {
+					"grant_type": "client_credentials",
+					"client_id": "ENV",
+					"client_secret": "ENV"
+				}
+			},
+			"authenticate": {
+				"path": "/authorize?",
+				"path-parameters": {
+					"response_type": "code",
+					"client_id": "client_id",
+					"scope": "scope",
+					"redirect_uri": "redirect_uri"
+				},
+				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
+				"body": {
+					"grant_type": "client_credentials",
+					"client_id": "ENV",
+					"client_secret": "ENV"
+				},
+				"scope": ["user-read-private", "user-read-email"]
+			}
+		}
+	}
+]
