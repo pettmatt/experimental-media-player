@@ -23,14 +23,15 @@
 				"path-parameters": {
 					"response_type": "code",
 					"client_id": "CLIENT_ID",
-					"scope": "user-read-private, user-read-email",
-					"redirect_uri": "REDIRECT_URI"
+					"scope": "user-read-private,user-read-email",
+					"redirect_uri": "REDIRECT_URI",
+					"code_challenge_method": "S256",
+					"code_challenge": "GENERATED"
 				},
 				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
 				"body": {
 					"grant_type": "client_credentials",
-					"client_id": "ENV",
-					"client_secret": "ENV"
+					"client_id": "ENV"
 				}
 			}
 		}

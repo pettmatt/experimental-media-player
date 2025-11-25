@@ -1,10 +1,17 @@
+use base64::{Engine as _, engine::general_purpose};
 use serde::Deserialize;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::env;
 use std::{collections::HashMap, path::Path};
 use tokio;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+#[derive(Debug, Deserialize)]
+struct AuthResponse {
+    url: reqwest::Url,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -14,8 +21,27 @@ async fn main() -> Result<()> {
 
     if let Some(api) = apis.get("spotify") {
         println!("\nExecuting auth for {}", api.url);
-        let x = api.authenticate().await;
-        println!("\nResult {:?}", x);
+        let response = api.authenticate().await;
+
+        if let Ok((result, state)) = response {
+            if let Ok(response) = result.error_for_status() {
+                let json: AuthResponse = response.json().await?;
+                let state_param = json
+                    .url
+                    .query_pairs()
+                    .find(|(key, _)| key == "sort")
+                    .map(|(_, value)| value.to_string());
+
+                if let Some(state_value) = state_param {
+                    if state_value == state {
+                        println!("Response can be trusted!");
+                        println!("\nResult {:?}", json);
+                    }
+                };
+            } else {
+                println!("Authentication failed. Status contained an error code.");
+            }
+        }
     }
 
     Ok(())
@@ -135,6 +161,18 @@ impl Authentication {
             })
             .collect()
     }
+
+    fn sha256(&self, raw: String) -> String {
+        let mut encoder = Sha256::new();
+        let data = raw.as_bytes();
+        encoder.update(data);
+        let result = encoder.finalize();
+        format!("{:x}", result)
+    }
+
+    fn base64(&self, hash: String) -> String {
+        general_purpose::STANDARD.encode(hash.as_bytes())
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -147,10 +185,17 @@ struct Api {
 impl Api {
     async fn authenticate(&self) -> Result<(reqwest::Response, String)> {
         let state = self.authentication.generate_random_string(16);
+        let raw_state = self.authentication.generate_random_string(64);
+        let hash = self.authentication.sha256(raw_state);
+        let challenge = self.authentication.base64(hash);
+
         let mut auth_path = self.paths.get("authenticate").cloned().unwrap();
         auth_path
             .path_parameters
             .insert("state".to_string(), state.clone());
+        auth_path
+            .path_parameters
+            .insert("code_challenge".to_string(), challenge);
 
         let redirect = env::var("SPOTIFY_REDIRECT_URI").unwrap_or_else(|_| "NONE".to_string());
         let client_id = env::var("SPOTIFY_CLIENT_ID").unwrap_or_else(|_| "NONE".to_string());
@@ -166,9 +211,7 @@ impl Api {
             .and_modify(|v| *v = client_id.clone())
             .or_insert(client_id);
 
-        println!("{:?}", self);
         let response = self.get_request(&auth_path).await.unwrap();
-        println!("RESPONSE: {:?}", response);
         Ok((response, state))
     }
 
@@ -180,7 +223,7 @@ impl Api {
             subpath.path,
             subpath.stringify_path_parametrs()
         );
-        println!("URL {:?}", url);
+
         let response = client
             .get(url)
             .header("content-type", "application/json")
@@ -188,7 +231,6 @@ impl Api {
             .send()
             .await?;
 
-        println!("Request response {:?}", response);
         Ok(response)
     }
 
@@ -203,7 +245,6 @@ impl Api {
             .send()
             .await?;
 
-        println!("Request response {:?}", response);
         Ok(response)
     }
 }
