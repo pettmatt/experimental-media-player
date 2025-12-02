@@ -1,9 +1,9 @@
 // Custom sink that offers more flexible way to detect what is happening in the media player.
 // In this approach queue is handled by sink.
 
-use std::time::Duration;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 #[cfg(feature = "crossbeam-channel")]
 use crossbeam_channel::{Receiver, Sender};
@@ -13,17 +13,16 @@ use std::sync::mpsc::{Receiver, Sender};
 
 use rodio::mixer::Mixer;
 // use dasp_sample::FromSample;
-use rodio::{queue, Source};
 use rodio::source::{Done, SeekError};
+use rodio::{queue, Source};
 
 pub struct Sink {
-	queue_tx: Arc<queue::SourcesQueueInput>,
-	sleep_until_end: Mutex<Option<Receiver<()>>>,
-
-	controls: Arc<Controls>,
-	sound_count: Arc<AtomicUsize>,
-
-	detached: bool,
+    queue_prv_tx: Arc<queue::SourcesQueueInput>, // Played songs
+    queue_tx: Arc<queue::SourcesQueueInput>,     // To be played
+    sleep_until_end: Mutex<Option<Receiver<()>>>,
+    controls: Arc<Controls>,
+    sound_count: Arc<AtomicUsize>,
+    detached: bool,
 }
 
 struct SeekOrder {
@@ -67,16 +66,18 @@ struct Controls {
 }
 
 impl Sink {
-	pub fn connect_new(mixer: &Mixer) -> Sink {
-        let (sink, source) = Sink::new();
+    pub fn connect_new(mixer: &Mixer) -> Sink {
+        let (sink, source, _prv_source) = Sink::new();
         mixer.add(source);
         sink
     }
 
-    pub fn new() -> (Sink, queue::SourcesQueueOutput) {
+    pub fn new() -> (Sink, queue::SourcesQueueOutput, queue::SourcesQueueOutput) {
         let (queue_tx, queue_rx) = queue::queue(true);
+        let (queue_prv_tx, queue_prv_rx) = queue::queue(true);
 
         let sink = Sink {
+            queue_prv_tx,
             queue_tx,
             sleep_until_end: Mutex::new(None),
             controls: Arc::new(Controls {
@@ -91,86 +92,87 @@ impl Sink {
             sound_count: Arc::new(AtomicUsize::new(0)),
             detached: false,
         };
-        (sink, queue_rx)
+        (sink, queue_rx, queue_prv_rx)
     }
 
-	pub fn append<S: Source + Send + 'static>(&self, source: S) {
-		if self.controls.stopped.load(Ordering::SeqCst) {
+    pub fn append<S: Source + Send + 'static>(&self, source: S) {
+        if self.controls.stopped.load(Ordering::SeqCst) {
             if self.sound_count.load(Ordering::SeqCst) > 0 {
                 self.sleep_until_end();
             }
             self.controls.stopped.store(false, Ordering::SeqCst);
         }
 
-		let controls = self.controls.clone();
+        let controls = self.controls.clone();
         let start_played = AtomicBool::new(false);
 
-		let source = source
-			.speed(1.0)
-			// Must be placed before pausable but after speed & delay
-			.track_position()
-			.pausable(false)
-			.amplify(1.0)
-			.skippable()
-			.stoppable()
-			// If you change the duration update the docs for try_seek!
-			.periodic_access(Duration::from_millis(5), move |src| {
-				if controls.stopped.load(Ordering::SeqCst) {
-					src.stop();
-					*controls.position.lock().unwrap() = Duration::ZERO;
-				}
+        let source = source
+            .speed(1.0)
+            // Must be placed before pausable but after speed & delay
+            .track_position()
+            .pausable(false)
+            .amplify(1.0)
+            .skippable()
+            .stoppable()
+            // If you change the duration update the docs for try_seek!
+            .periodic_access(Duration::from_millis(5), move |src| {
+                if controls.stopped.load(Ordering::SeqCst) {
+                    src.stop();
+                    *controls.position.lock().unwrap() = Duration::ZERO;
+                }
 
-				{
-					let mut to_clear = controls.to_clear.lock().unwrap();
-					if *to_clear > 0 {
-						src.inner_mut().skip();
-						*to_clear -= 1;
-						*controls.position.lock().unwrap() = Duration::ZERO;
-					} else {
-						*controls.position.lock().unwrap() = src.inner().inner().inner().inner().get_pos();
-					}
-				}
+                {
+                    let mut to_clear = controls.to_clear.lock().unwrap();
+                    if *to_clear > 0 {
+                        src.inner_mut().skip();
+                        *to_clear -= 1;
+                        *controls.position.lock().unwrap() = Duration::ZERO;
+                    } else {
+                        *controls.position.lock().unwrap() =
+                            src.inner().inner().inner().inner().get_pos();
+                    }
+                }
 
-				let amp = src.inner_mut().inner_mut();
-				amp.set_factor(*controls.volume.lock().unwrap());
-				amp.inner_mut()
-					.set_paused(controls.pause.load(Ordering::SeqCst));
-				amp.inner_mut()
-					.inner_mut()
-					.inner_mut()
-					.set_factor(*controls.speed.lock().unwrap());
-				if let Some(seek) = controls.seek.lock().unwrap().take() {
-					seek.attempt(amp)
-				}
-				start_played.store(true, Ordering::SeqCst);
-			});
+                let amp = src.inner_mut().inner_mut();
+                amp.set_factor(*controls.volume.lock().unwrap());
+                amp.inner_mut()
+                    .set_paused(controls.pause.load(Ordering::SeqCst));
+                amp.inner_mut()
+                    .inner_mut()
+                    .inner_mut()
+                    .set_factor(*controls.speed.lock().unwrap());
+                if let Some(seek) = controls.seek.lock().unwrap().take() {
+                    seek.attempt(amp)
+                }
+                start_played.store(true, Ordering::SeqCst);
+            });
 
-		self.sound_count.fetch_add(1, Ordering::Relaxed);
-		let source = Done::new(source, self.sound_count.clone());
-		*self.sleep_until_end.lock().unwrap() = Some(self.queue_tx.append_with_signal(source));
-	}
+        self.sound_count.fetch_add(1, Ordering::Relaxed);
+        let source = Done::new(source, self.sound_count.clone());
+        *self.sleep_until_end.lock().unwrap() = Some(self.queue_tx.append_with_signal(source));
+    }
 
-	pub fn volume(&self) -> f32 {
+    pub fn volume(&self) -> f32 {
         *self.controls.volume.lock().unwrap()
     }
 
-	pub fn set_volume(&self, value: f32) {
+    pub fn set_volume(&self, value: f32) {
         *self.controls.volume.lock().unwrap() = value;
     }
 
-	pub fn speed(&self) -> f32 {
+    pub fn speed(&self) -> f32 {
         *self.controls.speed.lock().unwrap()
     }
 
-	pub fn set_speed(&self, value: f32) {
+    pub fn set_speed(&self, value: f32) {
         *self.controls.speed.lock().unwrap() = value;
     }
 
-	pub fn play(&self) {
+    pub fn play(&self) {
         self.controls.pause.store(false, Ordering::SeqCst);
     }
 
-	pub fn try_seek(&self, pos: Duration) -> Result<(), SeekError> {
+    pub fn try_seek(&self, pos: Duration) -> Result<(), SeekError> {
         let (order, feedback) = SeekOrder::new(pos);
         *self.controls.seek.lock().unwrap() = Some(order);
 
@@ -191,22 +193,22 @@ impl Sink {
         }
     }
 
-	pub fn pause(&self) {
+    pub fn pause(&self) {
         self.controls.pause.store(true, Ordering::SeqCst);
     }
 
-	pub fn is_paused(&self) -> bool {
+    pub fn is_paused(&self) -> bool {
         self.controls.pause.load(Ordering::SeqCst)
     }
 
-	pub fn clear(&self) {
+    pub fn clear(&self) {
         let len = self.sound_count.load(Ordering::SeqCst) as u32;
         *self.controls.to_clear.lock().unwrap() = len;
-        // self.sleep_until_end();
-        // self.pause();
+        self.sleep_until_end();
+        self.pause();
     }
 
-	pub fn skip_one(&self) {
+    pub fn skip_one(&self) {
         let len = self.sound_count.load(Ordering::SeqCst) as u32;
         let mut to_clear = self.controls.to_clear.lock().unwrap();
         if len > *to_clear {
@@ -214,21 +216,21 @@ impl Sink {
         }
     }
 
-	pub fn stop(&self) {
+    pub fn stop(&self) {
         self.controls.stopped.store(true, Ordering::SeqCst);
     }
 
-	pub fn detach(mut self) {
+    pub fn detach(mut self) {
         self.detached = true;
     }
 
-	pub fn sleep_until_end(&self) {
+    pub fn sleep_until_end(&self) {
         if let Some(sleep_until_end) = self.sleep_until_end.lock().unwrap().take() {
             let _ = sleep_until_end.recv();
         }
     }
 
-	pub fn empty(&self) -> bool {
+    pub fn empty(&self) -> bool {
         self.len() == 0
     }
 
@@ -237,7 +239,7 @@ impl Sink {
         self.sound_count.load(Ordering::Relaxed)
     }
 
-	pub fn get_pos(&self) -> Duration {
+    pub fn get_pos(&self) -> Duration {
         *self.controls.position.lock().unwrap()
     }
 }
@@ -246,6 +248,7 @@ impl Drop for Sink {
     #[inline]
     fn drop(&mut self) {
         self.queue_tx.set_keep_alive_if_empty(false);
+        self.queue_prv_tx.set_keep_alive_if_empty(false);
 
         if !self.detached {
             self.controls.stopped.store(true, Ordering::Relaxed);
