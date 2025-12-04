@@ -1,0 +1,16 @@
+[package]
+name = "audio_test"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = "2.0.16"
+serde = "1.0.228"
+serde_json = "1.0.145"
+glib = "0.21.4"
+gstreamer = "0.24.3"
+gstreamer-app = "0.24.2"
+gstreamer-audio = "0.24.2"
+dasp_sample = "0.11.0"
+anyhow = "1.0.100"
+derive_more = { version = "2.1.0", features = ["full"] }
