@@ -1,6 +1,7 @@
 use std::{
     env,
     sync::{Arc, Mutex},
+    time::Duration,
 };
 
 use anyhow::Error;
@@ -38,10 +39,13 @@ pub struct MediaPlayer {
 }
 
 impl MediaPlayer {
-    pub fn new() -> Self {
+    pub fn new(s: String) -> Self {
         Self {
             pipeline: gstreamer::Pipeline::default(),
-            source: ElementFactory::make("filesrc").build().unwrap(),
+            source: ElementFactory::make("filesrc")
+                // .property("location", "")
+                .build()
+                .unwrap(),
             decode_bin: ElementFactory::make("decodebin").build().unwrap(),
             volume: ElementFactory::make("volume").build().unwrap(),
             playlist: Vec::new(),
@@ -102,30 +106,40 @@ impl MediaPlayer {
         Ok(())
     }
 
-    pub fn initialize(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn initialize_bins(&self) -> Result<(), Box<dyn std::error::Error>> {
         self.pipeline.add_many([&self.source, &self.decode_bin])?;
         Element::link_many([&self.source, &self.decode_bin])?;
+        Ok(())
+    }
 
+    pub fn deinitialize_bins(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.pipeline
+            .remove_many([&self.source, &self.decode_bin])?;
+        Element::unlink_many([&self.source, &self.decode_bin]);
         Ok(())
     }
 
     pub fn start(&mut self, track: String) {
-        // Bug: If the source is not set at the start set_state() will create an error.
-        self.pipeline.set_state(State::Paused).unwrap();
-        if self
-            .source
-            .has_property_with_type("location", glib::Type::INVALID)
-        {
-            println!("Invalid");
-            self.change_source(track.clone());
-        } else {
-            println!("Invalid else {:?}", self.source);
-            self.set_source(track.clone());
-            println!("Invalid else 2 {:?}", self.source);
-            self.initialize().unwrap();
-        }
+        println!(
+            "GState: {:?}",
+            self.pipeline.state(gstreamer::ClockTime::NONE).1
+        );
+        // Bug: the if-statement creates an error that introduces an error to state change
+        // if self
+        //     .source
+        //     .has_property_with_type("location", glib::Type::INVALID)
+        // {
+        // TODO: Add logic to check if the source needs updating.
+        self.change_local_source(String::from("/home/pickled/Musiikki/Linkin Park - Meteora/11 - Linkin Park - Nobody's Listening.ogg"));
+        // }
+        // else {
+        // TODO: Check how pads can be reinitialize gracefully.
+        // self.set_local_source(String::from("/home/pickled/Musiikki/Linkin Park - Meteora/11 - Linkin Park - Nobody's Listening.ogg")); // Probably needs to reinitialize with other pads
+        // self.initialize().unwrap();
+        // }
 
-        self.set_volume(0.1f64);
+        // self.pipeline.set_state(State::Paused).unwrap();
+        // self.set_volume(0.1f64);
         self.pipeline
             .seek_simple(
                 gstreamer::SeekFlags::FLUSH | gstreamer::SeekFlags::KEY_UNIT,
@@ -133,6 +147,18 @@ impl MediaPlayer {
             )
             .unwrap();
         self.pipeline.set_state(State::Playing).unwrap();
+
+        // Changing source on the fly, still WIP
+        std::thread::sleep(Duration::from_secs(3));
+        self.pipeline.set_state(State::Null).unwrap();
+        if self.deinitialize_bins().is_ok() {
+            self.initialize_bins().unwrap();
+            self.change_local_source(String::from(
+                "/home/pickled/Musiikki/Linkin Park - Meteora/06 - Linkin Park - Easier To Run.ogg",
+            ));
+            self.pipeline.set_state(State::Playing).unwrap();
+        }
+
         let bus = self
             .pipeline
             .bus()
@@ -143,19 +169,32 @@ impl MediaPlayer {
         }
     }
 
-    fn set_source(&mut self, source_path: String) {
+    // Creating new pad doesn't work (probably because it's not connected to other pads)
+    fn set_local_source(&mut self, source_path: String) {
         self.source = ElementFactory::make("filesrc")
             .property("location", source_path)
             .build()
             .unwrap();
     }
 
-    pub fn change_source(&mut self, source_path: String) {
+    // Probably won't work
+    fn set_online_source(&mut self, source_path: String) {
+        self.source = ElementFactory::make("urisourcebin") // Can also be parsebin, uridecodebin3
+            .property("location", source_path)
+            .build()
+            .unwrap();
+    }
+
+    pub fn change_local_source(&mut self, source_path: String) {
+        self.source.set_property("location", source_path);
+    }
+
+    pub fn change_online_source(&mut self, source_path: String) {
         self.source.set_property("location", source_path);
     }
 
     pub fn set_volume(&self, value: f64) {
-        self.volume.set_property("volume", value);
+        self.source.set_property("volume", value);
     }
 }
 
@@ -170,9 +209,9 @@ fn example_main() -> Result<(), Error> {
         std::process::exit(-1)
     };
 
-    let mut instance = MediaPlayer::new();
+    let mut instance = MediaPlayer::new(String::from(uri));
 
-    if let Err(e) = instance.initialize() {
+    if let Err(e) = instance.initialize_bins() {
         println!("Error occured while initializing pads: {e}");
     }
 

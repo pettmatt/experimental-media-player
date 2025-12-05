@@ -36,6 +36,8 @@ async fn main() -> Result<()> {
                     if state_value == state {
                         println!("Response can be trusted!");
                         println!("\nResult {:?}", json);
+                    } else {
+                        println!("Response CANNOT be trusted!");
                     }
                 };
             } else {
