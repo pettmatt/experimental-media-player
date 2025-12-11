@@ -25,29 +25,34 @@ export component MediaControllers {
 			Button { text: @tr("loop"); clicked => { MediaActions.media_loop() } }
 			Button { text: @tr("volume"); clicked => { MediaActions.media_loop() } }
 			Rectangle {
-				width: 25px;
-				height: 25px;
-				background: Colors.pink;
+				bg := Rectangle {
+					width: 25px;
+					height: 25px;
+					background: Colors.pink;
 
-				ta := TouchArea {
-					changed has-hover => {
-						if self.has-hover {
-							vs.visible = true;
-						} else {
-							vs.visible = false;
-						}
+					ta := TouchArea {
+						height: vs.visible
+							? parent.height + vs.height
+							: parent.height;
 					}
-					height: vs.visible
-						? parent.height + vs.height
-						: parent.height;
+
+					vs := VolumeSlider {
+						settings: SlintState.settings;
+						width: parent.width;
+						y: -parent.height / 2- 5px;
+					}
 				}
 
-				vs := VolumeSlider {
-					y: parent.y - parent.height;
-					settings: SlintState.settings;
-				}
-
-				// if ta.has-hover: 
+				states [
+					inactive when !ta.has-hover && !vs.has-focus: {
+						bg.background: Colors.beige;
+						vs.visible: false;
+					}
+					active-hover when ta.has-hover || vs.has-focus: {
+						bg.background: Colors.aqua;
+						vs.visible: true;
+					}
+				]
 			}
 		}
 

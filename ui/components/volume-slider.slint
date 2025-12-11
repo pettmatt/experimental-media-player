@@ -1,10 +1,18 @@
 import { Slider } from "std-widgets.slint";
-import { SlintSettings } from "../data-flow.slint";
+import { SlintSettings, MediaActions } from "../data-flow.slint";
 
 export component VolumeSlider inherits Slider {
 	in property<SlintSettings> settings;
 
 	orientation: Orientation.vertical;
-	width: 50px;
+	width: 20px;
+	height: 100px;
 	value: settings.volume_preset;
+	step: 0.01;
+	minimum: 0;
+	maximum: 1;
+	changed(value) => {
+		MediaActions.media_change_volume(value)
+	}
+	// released(value) => {}
 }

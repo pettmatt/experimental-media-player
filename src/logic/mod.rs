@@ -4,9 +4,10 @@ mod audio;
 mod source;
 pub mod database;
 pub mod queue;
+pub mod source;
 pub mod ui_events;
 mod custom {
-	use thiserror::Error;
+    use thiserror::Error;
 
 	#[derive(Error, Debug)]
 	pub enum ErrorHandler {

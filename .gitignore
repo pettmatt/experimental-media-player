@@ -11,8 +11,8 @@
 *.sln
 *.sw?
 
+.env
+.env-*
 target/
 todo.*
 database/
-
-.env-*

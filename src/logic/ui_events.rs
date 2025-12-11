@@ -191,7 +191,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
     });
 }
 
-mod audio_control_events {
+pub mod audio_control_events {
     use crate::{
         logic::{
             audio::test::MediaPlayer,

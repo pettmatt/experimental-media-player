@@ -40,7 +40,7 @@ pub struct Playlist {
 	pub _audio_list_string: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueueItem {
 	pub media_id: i32,
 }
