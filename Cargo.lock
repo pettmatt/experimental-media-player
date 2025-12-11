@@ -456,22 +456,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "audio_test"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dasp_sample",
- "derive_more",
- "glib",
- "gstreamer",
- "gstreamer-app",
- "gstreamer-audio",
- "serde",
- "serde_json",
- "thiserror 2.0.16",
-]
-
-[[package]]
 name = "auto_enums"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
