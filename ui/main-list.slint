@@ -10,16 +10,16 @@ export component MainList {
 	ScrollView {
 		vertical-stretch: 1;
 		horizontal-stretch: 1;
-		
+
 		for media in list: TouchArea {
 			clicked => {
 				MediaActions.media_start(media.id);
 			}
-			
+
 			Rectangle {
 				height: 30px;
 				background: Palette.secondary-background;
-				
+
 				HorizontalBox {
 					alignment: start;
 
@@ -35,28 +35,22 @@ export component MainList {
 				}
 			}
 
-			// TODO: [BUG] There's something weird going on here, which results to application panicing
-			// ContextMenuArea {
-			// 	Menu {
-			// 		MenuItem {
-			// 			title: @tr("Add to queue");
-			// 			// icon: "";
-			// 			activated() => {}
-			// 		}
-
-			// 		Menu {
-			// 			title: @tr("Add to playlist");
-			// 			// icon: "";
-
-			// 			for playlist in playlists: MenuItem {
-			// 				title: playlist.name;
-			// 				activated() => {
-			// 					MediaActions.add_to_playlist(playlist.id, media.id);
-			// 				}
-			// 			}
-			// 		}
-			// 	}
-			// }
+			ContextMenuArea {
+		        Menu {
+		            MenuItem {
+		                title: @tr("Add to queue");
+		                activated => { debug("Add to queue"); }
+		            }
+		            Menu {
+		                title: @tr("Add to playlist");
+						// TODO: Dynamically add playlists to context menu. For loop below is not supported.
+						// for playlist in playlists: MenuItem {
+		                    // title: playlist.name;
+							// activated() => { debug("Add to a specific playlist"); }
+		                // }
+		            }
+		        }
+		    }
 		}
 	}
 }
