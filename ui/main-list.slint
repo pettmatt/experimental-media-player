@@ -8,49 +8,52 @@ export component MainList {
 	property<MainView> main-view-id: MainView.index;
 
 	ScrollView {
-		vertical-stretch: 1;
-		horizontal-stretch: 1;
+		height: parent.height + 50px;
+		VerticalLayout {
+			spacing: 5px;
+			alignment: LayoutAlignment.start;
 
-		for media in list: TouchArea {
-			clicked => {
-				MediaActions.media_start(media.id);
-			}
+			for media in list: TouchArea {
+				clicked => {
+					MediaActions.media_start(media.id);
+				}
 
-			Rectangle {
-				height: 30px;
-				background: Palette.secondary-background;
+				Rectangle {
+					height: 30px;
+					background: Palette.secondary-background;
 
-				HorizontalBox {
-					alignment: start;
+					HorizontalBox {
+						alignment: start;
 
-					Text { text: media.name; }
-					Text { text: media.artist; }
-					Text { text: media.playing ? "[1]" : "[0]"; }
-					// Button {
+						Text { text: media.name; }
+						Text { text: media.artist; }
+						Text { text: media.playing ? "[1]" : "[0]"; }
+						// Button {
 						// 	text: "Play";
 						// 	clicked => {
 						// 		ma.media_start(item.id);
 						// 	}
 						// }
+					}
 				}
-			}
 
-			ContextMenuArea {
-		        Menu {
-		            MenuItem {
-		                title: @tr("Add to queue");
-		                activated => { debug("Add to queue"); }
-		            }
-		            Menu {
-		                title: @tr("Add to playlist");
-						// TODO: Dynamically add playlists to context menu. For loop below is not supported.
-						// for playlist in playlists: MenuItem {
-		                    // title: playlist.name;
-							// activated() => { debug("Add to a specific playlist"); }
-		                // }
-		            }
-		        }
-		    }
+				ContextMenuArea {
+			        Menu {
+			            MenuItem {
+			                title: @tr("Add to queue");
+			                activated => { debug("Add to queue"); }
+			            }
+			            Menu {
+			                title: @tr("Add to playlist");
+							// TODO: Dynamically add playlists to context menu. For loop below is not supported.
+							// for playlist in playlists: MenuItem {
+			                    // title: playlist.name;
+								// activated() => { debug("Add to a specific playlist"); }
+			                // }
+			            }
+			        }
+			    }
+			}
 		}
 	}
 }
