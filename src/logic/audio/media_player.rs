@@ -1,6 +1,6 @@
 use rodio::{self, Decoder, OutputStream};
 use std::{fs::File, path::Path, sync::{Arc, Mutex}, time::Duration};
-use crate::{logic::database::MediaFile, State};
+use crate::{logic::database_types::track::Track, State};
 use super::sink::Sink;
 
 // Rodio docs: https://docs.rs/rodio/latest/rodio/
@@ -17,7 +17,7 @@ impl MediaPlayer {
 		Self { sink: None, stream_handle: None }
 	}
 
-	pub fn start(&mut self, audio: &MediaFile) {
+	pub fn start(&mut self, audio: &Track) {
 		if self.sink.is_none() {
 			let (stream_handle, new_sink) = open_stream();
 			self.sink = Some(Arc::new(Mutex::new(new_sink)));
@@ -33,7 +33,7 @@ impl MediaPlayer {
 		}
 	}
 
-	pub fn start_next(&mut self, audio: &MediaFile) {
+	pub fn start_next(&mut self, audio: &Track) {
 
 	}
 
@@ -86,7 +86,7 @@ impl MediaPlayer {
 			// 	.collect();
 
 			// let mut previous_audio = None;
-			
+
 			// let mut index: i32 = 0;
 			// for audio in state.index.iter() {
 			// 	if audio.id == current_audio[0].media_id {
@@ -117,17 +117,17 @@ impl MediaPlayer {
 		}
 	}
 
-	pub fn create_queue(&self, media_files: Vec<&MediaFile>) -> Result<(), ()> {
+	pub fn create_queue(&self, media_files: Vec<&Track>) -> Result<(), ()> {
 		let _ = media_files.iter().map(|media_file| {
 			if let Some(sink) = &self.sink {
 				{
 					let guard = sink.lock().unwrap();
 					guard.clear();
 				}
-				
+
 				let file = File::open(&media_file.path).unwrap();
 				let source = Decoder::try_from(file).unwrap();
-					
+
 				if let Some(guard) = self.sink.as_ref() {
 					if let Ok(sink) = guard.lock() {
 						sink.append(source);
@@ -139,7 +139,7 @@ impl MediaPlayer {
 		Ok(())
 	}
 
-	pub fn add_to_queue(&self, state: &mut State, media_file: &MediaFile) -> Result<(), ()> {
+	pub fn add_to_queue(&self, state: &mut State, media_file: &Track) -> Result<(), ()> {
 		if let Ok(file) = File::open(&media_file.path) {
 			if let Ok(source) = Decoder::try_from(file) {
 				if let Some(guard) = &self.sink {

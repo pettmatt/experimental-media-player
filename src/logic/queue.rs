@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use rand::prelude::*;
-use crate::State;
-use super::database::{MediaFile, QueueItem};
+use crate::{logic::database_types::track::Track, QueueItem, State};
 
 pub trait Queue {
-	fn add_to_queue(&mut self, media: &MediaFile);
+	fn add_to_queue(&mut self, media: &Track);
 	fn remove_from_queue(&mut self, id: i32);
 	fn progress_queue(&mut self) -> Vec<QueueItem>;
 	fn update_playing_audio_in_queue(&mut self, index: i32) -> Option<(usize, usize)>;
@@ -12,7 +11,7 @@ pub trait Queue {
 }
 
 impl Queue for State {
-	fn add_to_queue(&mut self, media: &MediaFile) {
+	fn add_to_queue(&mut self, media: &Track) {
 		self.queue.push(QueueItem {
 			media_id: media.id,
 		});
@@ -27,7 +26,7 @@ impl Queue for State {
 	}
 
 	fn progress_queue(&mut self) -> Vec<QueueItem> {
-		let index_map: HashMap<i32, &MediaFile> = self.index.iter().map(|item| (item.id, item)).collect();
+		let index_map: HashMap<i32, &Track> = self.index.iter().map(|item| (item.id, item)).collect();
 		let found: Option<usize> = self.queue.iter().position(|item| {
 			if let Some(track) = index_map.get(&item.media_id) {
 				return track.playing;
@@ -54,7 +53,7 @@ impl Queue for State {
 				}
 			}
 
-			// Either loop, add x amount of random tracks to queue from index (if the queue has ended) 
+			// Either loop, add x amount of random tracks to queue from index (if the queue has ended)
 			// or just stop playing audio.
 			// Currently, does nothing.
 

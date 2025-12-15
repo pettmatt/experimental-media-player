@@ -1,9 +1,9 @@
 use super::{audio::test::MediaPlayer, source};
+use crate::logic::database_types::source::Source;
+use crate::logic::database_types::track::Track;
+use crate::logic::database;
 use crate::logic::queue::Queue;
-use crate::logic::{
-    database::{self, MediaFile, Source},
-    validate_sources,
-};
+use crate::logic::validate_sources;
 use crate::{AppWindow, MediaActions, SettingActions, SlintState, State};
 use slint::ComponentHandle;
 use std::{cell::RefCell, rc::Rc};
@@ -12,7 +12,7 @@ pub fn handle_initialization(state: &mut State) {
     // Initialize database or restore previous session
     if database::initialize_tables().is_ok() {
         println!("Database initialized");
-        if let Ok(list) = database::get_table::<MediaFile>() {
+        if let Ok(list) = database::get_table::<Track>() {
             println!("Fetched most recent details: {:?}", list);
             state.index = list;
         }
@@ -25,7 +25,7 @@ pub fn handle_initialization(state: &mut State) {
         println!("Checked files {:?}", &read_sources);
         database::add_records(read_sources);
         println!("Updated file sources");
-        if let Ok(media_list) = database::get_table::<MediaFile>() {
+        if let Ok(media_list) = database::get_table::<Track>() {
             println!("Files: {:?}", media_list);
             state.index = media_list;
         }
@@ -195,7 +195,7 @@ pub mod audio_control_events {
     use crate::{
         logic::{
             audio::test::MediaPlayer,
-            database::{self, MediaFile, QueueItem},
+            database_types::{track::Track, queue_item::QueueItem}
         },
         State,
     };
@@ -205,13 +205,13 @@ pub mod audio_control_events {
         // media_player.borrow_mut().source_toggle();
     }
 
-    pub fn handle_media_start(media_player: &mut Rc<RefCell<MediaPlayer>>, media: &MediaFile) {
+    pub fn handle_media_start(media_player: &mut Rc<RefCell<MediaPlayer>>, media: &Track) {
         media_player.borrow_mut().start(media);
     }
 
     pub fn handle_media_change(
         media_player: &mut Rc<RefCell<MediaPlayer>>,
-        media: &MediaFile,
+        media: &Track,
         (previous_index, current_index): (usize, usize),
     ) {
         // If the queue moved only by one, skip to next track
@@ -235,7 +235,7 @@ pub mod audio_control_events {
 
     pub fn handle_add_media_queue(
         media_player: Rc<RefCell<MediaPlayer>>,
-        record: &MediaFile,
+        record: &Track,
         state: &mut State,
     ) {
         // if let Ok(()) = media_player.borrow_mut().add_to_queue(state, record) {

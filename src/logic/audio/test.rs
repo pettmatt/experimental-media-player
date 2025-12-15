@@ -1,4 +1,4 @@
-use crate::{logic::database::MediaFile, State as AppState};
+use crate::{logic::database_types::track::Track, State as AppState};
 use anyhow::Error;
 use derive_more::derive::{Display, Error};
 use gstreamer::{element_error, element_warning, prelude::*, State};
@@ -204,7 +204,7 @@ impl MediaPlayer {
         Ok(())
     }
 
-    pub fn start(&mut self, audio: &MediaFile) {
+    pub fn start(&mut self, audio: &Track) {
         if self.source.is_none() {
             self.change_source(audio.path.clone()).unwrap();
         }
@@ -229,7 +229,7 @@ impl MediaPlayer {
         // self.clean_up().unwrap();
     }
 
-    pub fn start_next(&mut self, audio: &MediaFile) {}
+    pub fn start_next(&mut self, audio: &Track) {}
 
     pub fn source_toggle(&mut self) {}
 
@@ -243,9 +243,9 @@ impl MediaPlayer {
 
     pub fn clear_queue(&self) {}
 
-    // pub fn create_queue(&self, media_files: Vec<&MediaFile>) -> Result<(), ()> {}
+    // pub fn create_queue(&self, media_files: Vec<&Track>) -> Result<(), ()> {}
 
-    // pub fn add_to_queue(&self, state: &mut State, media_file: &MediaFile) -> Result<(), ()> {}
+    // pub fn add_to_queue(&self, state: &mut State, media_file: &Track) -> Result<(), ()> {}
 
     fn load_queue_from_state(&mut self, state: &AppState) {}
 

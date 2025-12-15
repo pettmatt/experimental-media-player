@@ -2,8 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{cell::RefCell, error::Error, rc::Rc, time::{UNIX_EPOCH}};
-use logic::{database::{MediaFile, QueueItem, Playlist, AudioEntry}, ui_events as ui};
+use logic::{database_types::{track::Track, queue_item::QueueItem, playlist::Playlist}, ui_events as ui};
 use slint::{ComponentHandle, ModelRc, SharedString};
+
+use crate::logic::database_types::playlist::AudioEntry;
 
 mod logic;
 
@@ -19,7 +21,7 @@ struct TimeLine {
 
 #[derive(Clone, Debug, Default)]
 struct State {
-	index: Vec<MediaFile>,
+	index: Vec<Track>,
 	queue: Vec<QueueItem>, // Because Rodio doesn't offer frexible way to interact with the queue, we're managing by deleting the queue, whenever we want to make a change.
 	playing: TimeLine,
 	playlists: Vec<Playlist>,
@@ -41,7 +43,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 impl State {
-	pub fn set_index(&mut self, index: Option<Vec<MediaFile>>, globals: &SlintState) {
+	pub fn set_index(&mut self, index: Option<Vec<Track>>, globals: &SlintState) {
 		if let Some(i) = index {
 			self.index = i;
 		}
@@ -100,10 +102,10 @@ impl State {
 		};
 	}
 
-	pub fn convert_index(&self) -> Vec<slint_generatedAppWindow::SlintMediaFile> {
+	pub fn convert_index(&self) -> Vec<slint_generatedAppWindow::SlintTrack> {
 		self.index.clone()
 			.into_iter()
-			.map(|m| slint_generatedAppWindow::SlintMediaFile {
+			.map(|m| slint_generatedAppWindow::SlintTrack {
 				id: m.id,
 				artist: m.artist.into(),
 				extension: m.extension.into(),
@@ -118,13 +120,13 @@ impl State {
 
 
 
-	pub fn convert_queue(&self) -> Vec<slint_generatedAppWindow::SlintMediaFile> {
+	pub fn convert_queue(&self) -> Vec<slint_generatedAppWindow::SlintTrack> {
 		self.queue.clone()
 			.into_iter()
 			.map(|q| {
 				let media_file = self.find_source_by_id(q.media_id);
 				if let Some((_, m)) = media_file {
-					return slint_generatedAppWindow::SlintMediaFile {
+					return slint_generatedAppWindow::SlintTrack {
 						id: m.id,
 						artist: m.artist.clone().into(),
 						extension: m.extension.clone().into(),
@@ -136,7 +138,7 @@ impl State {
 					};
 				}
 
-				slint_generatedAppWindow::SlintMediaFile {
+				slint_generatedAppWindow::SlintTrack {
 					id: i32::MAX,
 					artist: SharedString::from(""),
 					extension: SharedString::from(""),
@@ -168,11 +170,11 @@ impl State {
 			.collect()
 	}
 
-	pub fn find_source_by_id(&self, id: i32) -> Option<(usize, &MediaFile)> {
+	pub fn find_source_by_id(&self, id: i32) -> Option<(usize, &Track)> {
 		self.index.iter().enumerate().find(|(_, media)| media.id == id)
 	}
 
-	pub fn merge_to_index(&mut self, records: Vec<MediaFile>) {
+	pub fn merge_to_index(&mut self, records: Vec<Track>) {
 		let merged = self.index.clone();
     	self.index.extend(records.into_iter().filter(|item| !merged.contains(item)));
 	}
@@ -203,14 +205,14 @@ impl From<AudioEntry> for (SharedString, i32) {
 
 fn convert_to_slint_model<T, E>(vec: Vec<T>) -> ModelRc<E>
 where
-	E: From<T> + Clone + 'static 
+	E: From<T> + Clone + 'static
 {
 	let slint_vec: Vec<E> = vec.into_iter().map(|item| E::from(item)).collect();
     ModelRc::new(slint::VecModel::from(slint_vec))
 }
 
 impl TimeLine {
-	pub fn update_timeline(&mut self, track: &MediaFile) {
+	pub fn update_timeline(&mut self, track: &Track) {
 		self.length = track.duration;
 		self.current = 0;
 	}

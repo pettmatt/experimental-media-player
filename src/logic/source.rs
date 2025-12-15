@@ -1,6 +1,7 @@
+use crate::logic::database_types::{source::Source, track::Track};
+
 use super::{
     custom::ErrorHandler,
-    database::{MediaFile, Source},
 };
 use lofty::file::AudioFile;
 use native_dialog::DialogBuilder;
@@ -20,8 +21,8 @@ pub fn new_local_source() -> Option<PathBuf> {
     path
 }
 
-pub fn read_source(source: PathBuf) -> Result<Vec<MediaFile>, Error> {
-    let mut list: Vec<MediaFile> = Vec::new();
+pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
+    let mut list: Vec<Track> = Vec::new();
     let path = source.as_path();
 
     let entries = fs::read_dir(path).expect("Couldn't read directory from path");
@@ -69,7 +70,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<MediaFile>, Error> {
                 let id = list.len() as i32;
 
                 if let Some(d) = duration {
-                    list.push(MediaFile {
+                    list.push(Track {
                         id,
                         artist,
                         name: file_name,
@@ -90,14 +91,14 @@ pub fn read_source(source: PathBuf) -> Result<Vec<MediaFile>, Error> {
     Ok(list)
 }
 
-pub fn validate_sources(source_list: Vec<Source>) -> Result<Vec<MediaFile>, ErrorHandler> {
+pub fn validate_sources(source_list: Vec<Source>) -> Result<Vec<Track>, ErrorHandler> {
     // Fetch sources, if fetching is done without issues, the sources are valid.
-    let mut file_list: Vec<MediaFile> = Vec::new();
+    let mut file_list: Vec<Track> = Vec::new();
 
     for source in source_list {
         if source.origin == "local" {
             let path = PathBuf::from(source.path);
-            let files: Vec<MediaFile> =
+            let files: Vec<Track> =
                 read_source(path).expect("Couldn't validate some media files");
 
             file_list.extend(files);
