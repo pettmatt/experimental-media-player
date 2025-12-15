@@ -36,8 +36,8 @@ export struct SlintPlaylist {
 }
 
 export global SlintState {
-	in property<[SlintMediaFile]> index;
-	in property<[SlintMediaFile]> queue;
+	in property<[SlintTrack]> index;
+	in property<[SlintTrack]> queue;
 	in property<[SlintPlaylist]> playlist;
 	in property<SlintTimeLine> timeline;
 	in property<SlintSettings> settings;
