@@ -1,5 +1,5 @@
 import { ListView, HorizontalBox } from "std-widgets.slint";
-import { MediaActions as ma, SlintMediaFile, SlintMediaFile, SlintState } from "data-flow.slint";
+import { MediaActions as ma, SlintTrack, SlintState } from "data-flow.slint";
 import { Palette } from "style.slint";
 
 
@@ -7,7 +7,7 @@ export component Queue {
 	accessible-role: none;
 	accessible-expandable: true;
 
-	in property<[SlintMediaFile]> queue;
+	in property<[SlintTrack]> queue;
 
 	Text { text: @tr("Queue"); }
 
@@ -17,7 +17,7 @@ export component Queue {
 
 	ListView {
 		height: parent.height;
-		
+
 		for item in queue: Rectangle {
 			background: pink;
 			// height: 30px;

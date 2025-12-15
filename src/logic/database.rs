@@ -37,24 +37,10 @@ fn connect() -> Result<Connection, ErrorHandler> {
 }
 
 pub fn initialize_tables() -> Result<(), ()> {
-	// TODO: Create more robust database structure:
-	// main -> tracks
-	// artist
-	// source
-	// queue (to restore previous session, could be renamed to "session" and store more data in it)
-	// playlists
-	// albums (created by structuring files in directories) or through *.ogg.m3u file
-	// settings
 	if let Ok(connection) = connect() {
 		let queries = [
 			"PRAGMA foreign_keys = ON;",
-			"CREATE TABLE IF NOT EXISTS sources (
-				id			INTEGER PRIMARY KEY AUTOINCREMENT,
-				origin 		TEXT NOT NULL,
-				path 		TEXT NOT NULL UNIQUE,
-				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
-			);",
-			"CREATE TABLE IF NOT EXISTS main (
+			"CREATE TABLE IF NOT EXISTS tracks (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				name 		TEXT NOT NULL,
 				artist 		TEXT NOT NULL,
@@ -65,26 +51,35 @@ pub fn initialize_tables() -> Result<(), ()> {
 				playing		INTEGER NOT NULL,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			"CREATE TABLE IF NOT EXISTS queue (
+			"CREATE TABLE IF NOT EXISTS sources (
+				id			INTEGER PRIMARY KEY AUTOINCREMENT,
+				origin 		TEXT NOT NULL,
+				path 		TEXT NOT NULL UNIQUE,
+				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
+			"CREATE TABLE IF NOT EXISTS session (
 				id			INTEGER PRIMARY KEY AUTOINCEMENT,
 				media_id	INTEGER NOT NULL,
-				created 	DATETIME DEFAULT (datetime('now', 'localtime')),
-				FOREIGN KEY (media_id) REFERENCES main(id)
+				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			"CREATE TABLE IF NOT EXISTS playlist (
+			"CREATE TABLE IF NOT EXISTS playlists (
 				id			INTEGER PRIMARY KEY AUTOINCEMENT,
+				type		TEXT NOT NULL,
 				name		TEXT NOT NULL,
 				sources		TEXT,
 				image_url	TEXT,
-				audio_list	TEXT,
+				tracks		TEXT,
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
 				listened_at	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			// "CREATE UNIQUE INDEX IF NOT EXISTS path_index ON main(path);",
-			// "CREATE INDEX IF NOT EXISTS name_index ON main(name);",
-			// "CREATE INDEX IF NOT EXISTS author_index ON main(author);",
-			// "CREATE INDEX IF NOT EXISTS source_index ON main(source);",
-			// "CREATE INDEX IF NOT EXISTS sources_index ON sources(path);"
+			"CREATE TABLE IF NOT EXISTS settings (
+				id			INTEGER PRIMARY KEY AUTOINCEMENT,
+				name		TEXT NOT NULL,
+				value		TEXT,
+				default		TEXT,
+				updated_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
+				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
 		];
 
 		let mut index = 0;

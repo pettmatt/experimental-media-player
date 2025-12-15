@@ -48,6 +48,18 @@ impl GetQuery for Source {
 				VALUES (?, ?);
 			"),
 			SqlQueries::Select => String::from("SELECT * FROM sources;"),
+			SqlQueries::Update => String::from("
+				UPDATE sources
+				SET
+					origin = (origin),
+					path = (path),
+				WHERE path = (path)
+				VALUES (?, ?);
+			"),
+			SqlQueries::Delete => String::from("
+				DELETE FROM sources WHERE path = (path)
+				VALUES (?);
+			"),
 		}
 	}
 }

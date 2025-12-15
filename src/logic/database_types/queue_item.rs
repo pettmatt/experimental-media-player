@@ -36,13 +36,16 @@ impl rusqlite::ToSql for QueueItem {
 impl GetQuery for QueueItem {
 	fn get_query(&self, query: SqlQueries) -> String {
 		match query {
-			SqlQueries::Insert => {
-				String::from("
-					INSERT INTO queue (media_id)
-					VALUES (?);
-				")
-			},
+			SqlQueries::Insert => String::from("
+				INSERT INTO session (media_id)
+				VALUES (?);
+			"),
 			SqlQueries::Select => String::from("SELECT * FROM queue;"),
+			SqlQueries::Update => String::from(""),
+			SqlQueries::Delete => String::from("
+				DELETE FROM session WHERE id = (id)
+				VALUES (?);
+			"),
 		}
 	}
 }

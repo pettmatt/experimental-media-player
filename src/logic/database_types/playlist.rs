@@ -81,10 +81,24 @@ impl GetQuery for Playlist {
 	fn get_query(&self, query: SqlQueries) -> String {
 		match query {
 			SqlQueries::Insert => String::from("
-				INSERT INTO playlists (name, sources, image_url, audio_list, created_at, listened_at)
-				VALUES (?, ?, ?, ?, ?, ?);
+				INSERT INTO playlists (name, type, sources, image_url, tracks, created_at, listened_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?);
 			"),
 			SqlQueries::Select => String::from("SELECT * FROM playlists;"),
+			SqlQueries::Update => String::from("
+				UPDATE playlists
+				SET
+					name = (name),
+					sources = (sources),
+					image_url = (image_url),
+					tracks = (tracks)
+				WHERE id = (id)
+				VALUES (?, ?, ?, ?, ?);
+			"),
+			SqlQueries::Delete => String::from("
+				DELETE FROM playlists WHERE id = (id)
+				VALUES (?);
+			"),
 		}
 	}
 }

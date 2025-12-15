@@ -31,5 +31,7 @@ pub trait Convertable {
 
 pub enum SqlQueries {
 	Insert,
-	Select
+	Select,
+	Update,
+	Delete
 }

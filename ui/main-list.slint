@@ -1,9 +1,9 @@
 import { HorizontalBox, Button, ListView, VerticalBox, StandardTableView, ScrollView } from "std-widgets.slint";
-import { SlintMediaFile, SlintQueueItem, MediaActions, SlintPlaylist, MainView } from "data-flow.slint";
+import { SlintTrack, SlintQueueItem, MediaActions, SlintPlaylist, MainView } from "data-flow.slint";
 import { Palette } from "style.slint";
 
 export component MainList {
-	in property<[SlintMediaFile]> list;
+	in property<[SlintTrack]> list;
 	in property<[SlintPlaylist]> playlists;
 	property<MainView> main-view-id: MainView.index;
 

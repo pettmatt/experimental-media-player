@@ -84,11 +84,28 @@ impl GetQuery for Track {
         match query {
             SqlQueries::Insert => String::from(
                 "
-					INSERT INTO main (name, artist, path, extension, file_size, duration, playing)
+					INSERT INTO tracks (name, artists, path, extension, file_size, duration, playing)
 					VALUES (?, ?, ?, ?, ?, ?, ?);
 				",
             ),
-            SqlQueries::Select => String::from("SELECT * FROM main;"),
+            SqlQueries::Select => String::from("SELECT * FROM tracks;"),
+ 			SqlQueries::Update => String::from("
+				UPDATE tracks
+				SET
+					name = (name),
+					artists = (artists),
+					path = (path),
+					extension = (extension),
+					file_size = (file_size),
+					duration = (duration),
+					playing = (playing),
+				WHERE id = (id)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+    		"),
+			SqlQueries::Delete => String::from("
+				DELETE FROM tracks WHERE id = (id)
+				VALUES (?);
+			"),
         }
     }
 }
