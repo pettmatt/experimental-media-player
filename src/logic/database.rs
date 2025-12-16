@@ -1,46 +1,51 @@
-use std::collections::HashMap;
+use crate::logic::data_types::{
+    Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams,
+};
 use rusqlite::{Connection, ErrorCode};
-use crate::logic::data_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
+use std::collections::HashMap;
 
 use super::custom::ErrorHandler;
 
 fn connect() -> Result<Connection, ErrorHandler> {
-	let db_path = String::from("./database/main.db");
-	let result: Result<Connection, rusqlite::Error> = Connection::open(&db_path);
+    let db_path = String::from("./database/main.db");
+    let result: Result<Connection, rusqlite::Error> = Connection::open(&db_path);
 
-	match result {
-		Ok(connect) => Ok(connect),
-		Err(error) => {
-			println!("Error occured: {}", error);
-			println!("Trying to solve the problem by creating it.");
+    match result {
+        Ok(connect) => Ok(connect),
+        Err(error) => {
+	        println!("Error occured: {}", error);
+	        println!("Trying to solve the problem by creating the db file.");
 
-			if error.sqlite_error_code() == Some(ErrorCode::NotFound) {
-				let mut builder = std::fs::DirBuilder::new();
-				builder.recursive(true).create("./database")?;
+			let coverable_errors =
+				error.sqlite_error_code() == Some(ErrorCode::NotFound) ||
+				error.sqlite_error_code() == Some(ErrorCode::CannotOpen);
 
-				match std::fs::File::create(db_path) {
-					Ok(file) => {
-						println!("Created sqlite db file: {:?}", file);
-						return self::connect();
-					},
-					Err(message) => {
-						println!("Error occured: {}", message);
-						return Err(ErrorHandler::Io(message));
-					}
-				}
-			}
+	        if coverable_errors {
+	            let mut builder = std::fs::DirBuilder::new();
+	            builder.recursive(true).create("./database").unwrap();
 
-			println!("Unhandled SQLite error occured: {}", error);
-			Err(ErrorHandler::Sqlite(error))
-		}
-	}
+	            match std::fs::File::create(db_path) {
+	                Ok(file) => {
+	                    println!("Created sqlite db file: {:?}", file);
+	                    return self::connect();
+	                }
+	                Err(message) => {
+	                    return Err(ErrorHandler::Io(message));
+	                }
+	            }
+	        }
+
+	        println!("Unhandled SQLite error occured: {}", error);
+	        Err(ErrorHandler::Sqlite(error))
+        },
+    }
 }
 
 pub fn initialize_tables() -> Result<(), ()> {
-	if let Ok(connection) = connect() {
-		let queries = [
-			"PRAGMA foreign_keys = ON;",
-			"CREATE TABLE IF NOT EXISTS tracks (
+    if let Ok(connection) = connect() {
+        let queries = [
+            "PRAGMA foreign_keys = ON;",
+            "CREATE TABLE IF NOT EXISTS tracks (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				name 		TEXT NOT NULL,
 				artists 	TEXT NOT NULL,
@@ -51,18 +56,18 @@ pub fn initialize_tables() -> Result<(), ()> {
 				playing		INTEGER NOT NULL,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			"CREATE TABLE IF NOT EXISTS sources (
+            "CREATE TABLE IF NOT EXISTS sources (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				origin 		TEXT NOT NULL,
 				path 		TEXT NOT NULL UNIQUE,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			"CREATE TABLE IF NOT EXISTS session (
+            "CREATE TABLE IF NOT EXISTS session (
 				id			INTEGER PRIMARY KEY AUTOINCEMENT,
 				track_id	INTEGER NOT NULL,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			"CREATE TABLE IF NOT EXISTS playlists (
+            "CREATE TABLE IF NOT EXISTS playlists (
 				id			INTEGER PRIMARY KEY AUTOINCEMENT,
 				type		TEXT NOT NULL,
 				name		TEXT NOT NULL,
@@ -72,7 +77,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
 				listened_at	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-			"CREATE TABLE IF NOT EXISTS settings (
+            "CREATE TABLE IF NOT EXISTS settings (
 				id			INTEGER PRIMARY KEY AUTOINCEMENT,
 				name		TEXT NOT NULL,
 				value		TEXT,
@@ -80,105 +85,111 @@ pub fn initialize_tables() -> Result<(), ()> {
 				updated_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-		];
+        ];
 
-		let mut index = 0;
-		for query in queries {
-			index += 1;
-			let response = connection.execute(query, ());
+        let mut index = 0;
+        for query in queries {
+            index += 1;
+            let response = connection.execute(query, ());
 
-			if let Err(message) = response {
-				println!("Error occured while initializing ({}): {:?}", index, message);
-				return Err(());
-			}
-		}
+            if let Err(message) = response {
+                println!(
+                    "Error occured while initializing ({}): {:?}",
+                    index, message
+                );
+                return Err(());
+            }
+        }
 
-		return Ok(());
-	}
+        return Ok(());
+    }
 
-	Err(())
+    Err(())
 }
 
-pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instanceable>()
-	-> Result<Vec<T>, ErrorHandler>
-{
-	match connect() {
-		Ok(connection) => {
-			let mut list: Vec<T> = Vec::new();
-			let instance = T::new();
-			let query = instance.get_query(SqlQueries::Select);
-			let mut statement = connection.prepare(&query)?;
+pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instanceable>(
+) -> Result<Vec<T>, ErrorHandler> {
+    match connect() {
+        Ok(connection) => {
+            let mut list: Vec<T> = Vec::new();
+            let instance = T::new();
+            let query = instance.get_query(SqlQueries::Select);
+            let mut statement = connection.prepare(&query)?;
 
-			let iter = statement
-				.query_map([], |row| {
-					Ok(T::from_row(row).unwrap())
-				})?;
+            let iter = statement.query_map([], |row| Ok(T::from_row(row).unwrap()))?;
 
-			for record in iter.flatten() {
-				list.push(record);
-			}
+            for record in iter.flatten() {
+                list.push(record);
+            }
 
-			println!("(Database) - get_table: {:?}", &list);
-			Ok(list)
-		},
-		Err(error) => Err(error),
-	}
+            println!("(Database) - get_table: {:?}", &list);
+            Ok(list)
+        }
+        Err(error) => Err(error),
+    }
 }
 
-pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
-	new_record: T
-) {
-	let connection = connect().unwrap();
-	if connection.execute(
-		&new_record.get_query(SqlQueries::Insert),
-		new_record.to_sql_params().as_slice()
-	).is_err() {
-		println!("Failed to execute add_record: {:?}; {:?}", new_record, connection);
-	};
+pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(new_record: T) {
+    if let Ok(connection) = connect() {
+        if connection.execute(
+                &new_record.get_query(SqlQueries::Insert),
+                new_record.to_sql_params().as_slice(),
+        ).is_err() {
+            println!(
+                "Failed to execute add_record: {:?}; {:?}",
+                new_record, connection
+            );
+        };
+    }
 }
 
 #[derive(std::fmt::Debug)]
 struct ErrorBody {
-	is_error: bool,
-	message: Result<usize, rusqlite::Error>,
+    is_error: bool,
+    message: Result<usize, rusqlite::Error>,
 }
 
-pub fn add_records<T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams + Convertable>(
-	new_records: Vec<T>
+pub fn add_records<
+    T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams + Convertable,
+>(
+    new_records: Vec<T>,
 ) {
-	let connection = connect().unwrap();
-	let mut result: HashMap<usize, ErrorBody> = HashMap::new();
+    if let Ok(connection) = connect() {
+        let mut result: HashMap<usize, ErrorBody> = HashMap::new();
 
-	for mut record in new_records {
-		record.convert_to_string();
-		let key = result.len();
-		let mut response = ErrorBody {
-			is_error: false,
-			message: Ok(0),
-		};
+        for mut record in new_records {
+            record.convert_to_string();
+            let key = result.len();
+            let mut response = ErrorBody {
+                is_error: false,
+                message: Ok(0),
+            };
 
-		let ex_result = connection.execute(
-			&record.get_query(SqlQueries::Insert),
-			record.to_sql_params().as_slice()
-		);
+            let ex_result = connection.execute(
+                &record.get_query(SqlQueries::Insert),
+                record.to_sql_params().as_slice(),
+            );
 
-		if ex_result.is_err() {
-			response.is_error = true;
-			response.message = ex_result;
-		};
+            if ex_result.is_err() {
+                response.is_error = true;
+                response.message = ex_result;
+            };
 
-		result.insert(key, response);
-	}
+            result.insert(key, response);
+        }
 
-	println!("Failure Hashmap: {:?}", result);
+        println!("Failure Hashmap: {:?}", result);
+    }
 }
 
-pub fn update_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(new_records: Vec<T>) {
-	let connection = connect();
-
+pub fn update_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
+    new_records: Vec<T>,
+) {
+    if let Ok(connection) = connect() {}
 }
 
-pub fn delete_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(record_ids: Vec<i32>) {
-	let connection = connect();
-
+pub fn delete_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
+    record_ids: Vec<i32>,
+) {
+    if let Ok(connection) = connect() {}
 }
