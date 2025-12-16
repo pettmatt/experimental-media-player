@@ -1,4 +1,4 @@
-use crate::{logic::database_types::track::Track, State as AppState};
+use crate::{logic::data_types::track::Track, State as AppState};
 use anyhow::Error;
 use derive_more::derive::{Display, Error};
 use gstreamer::{element_error, element_warning, prelude::*, State};

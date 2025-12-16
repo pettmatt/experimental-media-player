@@ -2,10 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{cell::RefCell, error::Error, rc::Rc, time::{UNIX_EPOCH}};
-use logic::{database_types::{track::Track, queue_item::QueueItem, playlist::Playlist}, ui_events as ui};
-use slint::{ComponentHandle, ModelRc, SharedString};
+use logic::{data_types::{track::Track, queue_item::QueueItem, playlist::Playlist}, ui_events as ui};
+use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
-use crate::logic::database_types::playlist::AudioEntry;
+use crate::logic::data_types::playlist::AudioEntry;
 
 mod logic;
 
@@ -71,7 +71,7 @@ impl State {
 			image_url,
 			created_at: "".to_string(),
 			listened_at: "".to_string(),
-			audio_list: Vec::new(),
+			tracks: Vec::new(),
 			_audio_list_string: String::new(),
 			_sources_string: String::new(),
 		};
@@ -94,7 +94,7 @@ impl State {
 					id: media_id,
 					added_at: format!("{}", duration.as_secs()),
 				};
-				p.audio_list.push(new_entry);
+				p.tracks.push(new_entry);
 			}
 
 			let playlists: Vec<SlintPlaylist> = self.convert_playlist_to_slint();
@@ -105,15 +105,17 @@ impl State {
 	pub fn convert_index(&self) -> Vec<slint_generatedAppWindow::SlintTrack> {
 		self.index.clone()
 			.into_iter()
-			.map(|m| slint_generatedAppWindow::SlintTrack {
-				id: m.id,
-				artist: m.artist.into(),
-				extension: m.extension.into(),
-				name: m.name.into(),
-				path: m.path.into(),
-				duration: m.duration,
-				file_size: m.file_size,
-				playing: m.playing,
+			.map(|t| {
+				slint_generatedAppWindow::SlintTrack {
+					id: t.id,
+					artists: t.artists.into(),
+					extension: t.extension.into(),
+					name: t.name.into(),
+					path: t.path.into(),
+					duration: t.duration,
+					file_size: t.file_size,
+					playing: t.playing,
+				}
 			})
 			.collect()
 	}
@@ -124,28 +126,28 @@ impl State {
 		self.queue.clone()
 			.into_iter()
 			.map(|q| {
-				let media_file = self.find_source_by_id(q.media_id);
-				if let Some((_, m)) = media_file {
+				let track = self.find_source_by_id(q.track_id);
+				if let Some((_, t)) = track {
 					return slint_generatedAppWindow::SlintTrack {
-						id: m.id,
-						artist: m.artist.clone().into(),
-						extension: m.extension.clone().into(),
-						name: m.name.clone().into(),
-						path: m.path.clone().into(),
-						duration: m.duration,
-						file_size: m.file_size,
-						playing: m.playing,
+						id: t.id,
+						name: t.name.clone().into(),
+						artists: t.artists.clone().into(),
+						path: t.path.clone().into(),
+						extension: t.extension.clone().into(),
+						file_size: t.file_size,
+						duration: t.duration,
+						playing: t.playing,
 					};
 				}
 
 				slint_generatedAppWindow::SlintTrack {
 					id: i32::MAX,
-					artist: SharedString::from(""),
-					extension: SharedString::from(""),
 					name: SharedString::from(""),
+					artists: SharedString::from(""),
 					path: SharedString::from(""),
-					duration: 0,
+					extension: SharedString::from(""),
 					file_size: 0,
+					duration: 0,
 					playing: false,
 				}
 			})
@@ -164,7 +166,7 @@ impl State {
 					image_url: SharedString::from(p.image_url),
 					created_at: SharedString::from(p.created_at),
 					listened_at: SharedString::from(p.listened_at),
-					audio_list: convert_to_slint_model(p.audio_list),
+					audio_list: convert_to_slint_model(p.tracks),
 				}
 			})
 			.collect()
@@ -181,7 +183,7 @@ impl State {
 
 	fn set_index_playing(&mut self, index: usize, value: bool) -> Option<()> {
 		if let Some(queue_item) = self.queue.get(index) {
-			if let Some((media_index, _)) = self.find_source_by_id(queue_item.media_id) {
+			if let Some((media_index, _)) = self.find_source_by_id(queue_item.track_id) {
 				self.index[media_index].playing = value;
 
 				if value {

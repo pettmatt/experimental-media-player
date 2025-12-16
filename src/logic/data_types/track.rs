@@ -1,11 +1,11 @@
-use crate::logic::database_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Track {
     pub id: i32,
     pub name: String,
-    pub artist: String,
+    pub artists: String,
     pub path: String,
     pub extension: String,
     pub duration: i32,
@@ -19,7 +19,7 @@ impl std::fmt::Display for Track {
             f,
             "{}, {}, {}, {}, {}, {}, {}",
             self.name,
-            self.artist,
+            self.artists,
             self.path,
             self.extension,
             self.duration,
@@ -34,7 +34,7 @@ impl Instanceable for Track {
         Self {
             id: 0,
             name: "".to_string(),
-            artist: "".to_string(),
+            artists: "".to_string(),
             path: "".to_string(),
             extension: "".to_string(),
             file_size: 0,
@@ -46,10 +46,14 @@ impl Instanceable for Track {
 
 impl FromRow for Track {
     fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
+    	let artists_string: String = row.get("artists")?;
+     	let artists_temp: Vec<&str> = artists_string.split(", ").collect();
+      	let artists = artists_temp.into_iter().map(|s| s.to_string()).collect();
+
         let mut file = Self {
             id: row.get("id")?,
             name: row.get("name")?,
-            artist: row.get("artist")?,
+            artists: artists,
             path: row.get("path")?,
             extension: row.get("extension")?,
             file_size: row.get("file_size")?,
@@ -114,7 +118,7 @@ impl ToSqlParams for Track {
     fn to_sql_params(&self) -> Vec<&dyn ToSql> {
         vec![
             &self.name as &dyn ToSql,
-            &self.artist as &dyn ToSql,
+            &self.artists as &dyn ToSql,
             &self.path as &dyn ToSql,
             &self.extension as &dyn ToSql,
             &self.file_size as &dyn ToSql,

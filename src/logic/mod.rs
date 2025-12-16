@@ -1,7 +1,7 @@
 use custom::ErrorHandler;
-use crate::logic::database_types::{source::Source, track::Track};
+use crate::logic::data_types::{source::Source, track::Track};
 
-pub mod database_types;
+pub mod data_types;
 pub mod audio;
 pub mod database;
 pub mod queue;

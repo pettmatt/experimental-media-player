@@ -1,4 +1,4 @@
-use crate::logic::database_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 
 #[derive(Debug, Clone)]

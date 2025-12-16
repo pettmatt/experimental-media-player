@@ -1,4 +1,4 @@
-use crate::logic::database_types::{source::Source, track::Track};
+use crate::logic::data_types::{source::Source, track::Track};
 
 use super::{
     custom::ErrorHandler,
@@ -65,14 +65,14 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             if mime_type.is_some() {
                 // let name_array: Vec<&str> = file_name.split(".").collect();
                 // let audio_name = name_array[0];
-                let artist = String::from("unknown");
-                let path = format!("{:?}", entry_path);
                 let id = list.len() as i32;
+                let path = format!("{:?}", entry_path);
+                let artists = String::from("unknown");
 
                 if let Some(d) = duration {
                     list.push(Track {
                         id,
-                        artist,
+                        artists,
                         name: file_name,
                         extension: file_extension.to_string(),
                         path,

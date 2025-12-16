@@ -1,29 +1,29 @@
-use crate::logic::database_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueueItem {
-	pub media_id: i32,
+	pub track_id: i32,
 }
 
 impl Instanceable for QueueItem {
 	fn new() -> Self {
-		Self { media_id: 0 }
+		Self { track_id: 0 }
 	}
 }
 
 impl FromRow for QueueItem {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
 		Ok(Self {
-			media_id: row.get("media_id")?,
+			track_id: row.get("media_id")?,
 		})
 	}
 }
 
 impl CreateKey for QueueItem {
 	fn create_key(&self) -> String {
-		self.media_id.to_string()
+		self.track_id.to_string()
 	}
 }
 
@@ -37,7 +37,7 @@ impl GetQuery for QueueItem {
 	fn get_query(&self, query: SqlQueries) -> String {
 		match query {
 			SqlQueries::Insert => String::from("
-				INSERT INTO session (media_id)
+				INSERT INTO session (track_id)
 				VALUES (?);
 			"),
 			SqlQueries::Select => String::from("SELECT * FROM queue;"),
@@ -53,7 +53,7 @@ impl GetQuery for QueueItem {
 impl ToSqlParams for QueueItem {
 	fn to_sql_params(&self) -> Vec<&dyn ToSql> {
 		vec![
-			&self.media_id as &dyn ToSql,
+			&self.track_id as &dyn ToSql,
 		]
 	}
 }

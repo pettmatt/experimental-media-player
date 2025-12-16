@@ -26,7 +26,11 @@ export component MainList {
 						alignment: start;
 
 						Text { text: media.name; }
-						Text { text: media.artist; }
+
+						Text {
+							text: media.artists;
+						}
+
 						Text { text: media.playing ? "[1]" : "[0]"; }
 						// Button {
 						// 	text: "Play";

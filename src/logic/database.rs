@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use rusqlite::{Connection, ErrorCode};
-use crate::logic::database_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
 
 use super::custom::ErrorHandler;
 
@@ -43,7 +43,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 			"CREATE TABLE IF NOT EXISTS tracks (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				name 		TEXT NOT NULL,
-				artist 		TEXT NOT NULL,
+				artists 	TEXT NOT NULL,
 				path 		TEXT NOT NULL UNIQUE,
 				extension 	TEXT NOT NULL,
 				file_size 	INTEGER,
@@ -59,7 +59,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 			);",
 			"CREATE TABLE IF NOT EXISTS session (
 				id			INTEGER PRIMARY KEY AUTOINCEMENT,
-				media_id	INTEGER NOT NULL,
+				track_id	INTEGER NOT NULL,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
 			"CREATE TABLE IF NOT EXISTS playlists (
@@ -128,14 +128,13 @@ pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instancea
 pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
 	new_record: T
 ) {
-	if let Ok(connection) = connect() {
-		if connection.execute(
-			&new_record.get_query(SqlQueries::Insert),
-			new_record.to_sql_params().as_slice()
-		).is_err() {
-			println!("Failed to execute add_record: {:?}; {:?}", new_record, connection);
-		};
-	}
+	let connection = connect().unwrap();
+	if connection.execute(
+		&new_record.get_query(SqlQueries::Insert),
+		new_record.to_sql_params().as_slice()
+	).is_err() {
+		println!("Failed to execute add_record: {:?}; {:?}", new_record, connection);
+	};
 }
 
 #[derive(std::fmt::Debug)]
@@ -147,31 +146,39 @@ struct ErrorBody {
 pub fn add_records<T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams + Convertable>(
 	new_records: Vec<T>
 ) {
-	if let Ok(connection) = connect() {
-		println!("Adding records: {:?}", &new_records);
-		let mut result: HashMap<usize, ErrorBody> = HashMap::new();
+	let connection = connect().unwrap();
+	let mut result: HashMap<usize, ErrorBody> = HashMap::new();
 
-		for mut record in new_records {
-			record.convert_to_string();
-			let key = result.len();
-			let mut response = ErrorBody {
-				is_error: false,
-				message: Ok(0),
-			};
+	for mut record in new_records {
+		record.convert_to_string();
+		let key = result.len();
+		let mut response = ErrorBody {
+			is_error: false,
+			message: Ok(0),
+		};
 
-			let ex_result = connection.execute(
-				&record.get_query(SqlQueries::Insert),
-				record.to_sql_params().as_slice()
-			);
+		let ex_result = connection.execute(
+			&record.get_query(SqlQueries::Insert),
+			record.to_sql_params().as_slice()
+		);
 
-			if ex_result.is_err() {
-				response.is_error = true;
-				response.message = ex_result;
-			};
+		if ex_result.is_err() {
+			response.is_error = true;
+			response.message = ex_result;
+		};
 
-			result.insert(key, response);
-		}
-
-		println!("Failure Hashmap: {:?}", result);
+		result.insert(key, response);
 	}
+
+	println!("Failure Hashmap: {:?}", result);
+}
+
+pub fn update_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(new_records: Vec<T>) {
+	let connection = connect();
+
+}
+
+pub fn delete_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(record_ids: Vec<i32>) {
+	let connection = connect();
+
 }

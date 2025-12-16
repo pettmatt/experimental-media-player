@@ -1,4 +1,4 @@
-use crate::logic::database_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
@@ -16,7 +16,7 @@ pub struct Playlist {
 	pub image_url: String,
 	pub created_at: String,
 	pub listened_at: String,
-	pub audio_list: Vec<AudioEntry>,
+	pub tracks: Vec<AudioEntry>,
 	pub _sources_string: String,
 	pub _audio_list_string: String,
 }
@@ -25,7 +25,7 @@ impl std::fmt::Display for Playlist {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(
 			f, "{}, {:?}, {}, {}, {}, {:?}", self.name, self.sources, self.image_url,
-			self.created_at, self.listened_at, self.audio_list
+			self.created_at, self.listened_at, self.tracks
 		)
 	}
 }
@@ -39,7 +39,7 @@ impl Instanceable for Playlist {
 			image_url: "".to_string(),
 			created_at: "".to_string(),
 			listened_at: "".to_string(),
-			audio_list: Vec::new(),
+			tracks: Vec::new(),
 			_audio_list_string: String::new(),
 			_sources_string: String::new()
 		}
@@ -58,7 +58,7 @@ impl FromRow for Playlist {
 			image_url: row.get("image_url")?,
 			created_at: row.get("created_at")?,
 			listened_at: row.get("listened_at")?,
-			audio_list: serde_json::from_str(&audio_list).unwrap_or_default(),
+			tracks: serde_json::from_str(&audio_list).unwrap_or_default(),
 			_sources_string: String::new(),
 			_audio_list_string: String::new()
 		})

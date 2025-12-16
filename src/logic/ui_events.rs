@@ -1,6 +1,6 @@
 use super::{audio::test::MediaPlayer, source};
-use crate::logic::database_types::source::Source;
-use crate::logic::database_types::track::Track;
+use crate::logic::data_types::source::Source;
+use crate::logic::data_types::track::Track;
 use crate::logic::database;
 use crate::logic::queue::Queue;
 use crate::logic::validate_sources;
@@ -70,7 +70,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
                     if let Some((queue_index, _)) = temp_queue
                         .iter()
                         .enumerate()
-                        .find(|(_, queue_item)| queue_item.media_id == media.id)
+                        .find(|(_, queue_item)| queue_item.track_id == media.id)
                     {
                         state_clone.borrow_mut().playing.queue_index = Some(queue_index);
                     }
@@ -98,7 +98,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
             if let Some((previous_index, target_index)) = queue_result {
                 let is_empty = state_clone.borrow().queue.is_empty();
                 if !is_empty {
-                    let id = state_clone.borrow().queue[target_index].media_id;
+                    let id = state_clone.borrow().queue[target_index].track_id;
                     if let Some((_, media)) = state_clone.borrow().find_source_by_id(id) {
                         audio_control_events::handle_media_change(
                             &mut player_clone,
@@ -195,7 +195,7 @@ pub mod audio_control_events {
     use crate::{
         logic::{
             audio::test::MediaPlayer,
-            database_types::{track::Track, queue_item::QueueItem}
+            data_types::{track::Track, queue_item::QueueItem}
         },
         State,
     };

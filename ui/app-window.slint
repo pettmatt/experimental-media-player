@@ -22,9 +22,9 @@ export component AppWindow inherits Window {
 		width: 100%;
 		height: root.height - (root.width < 700px ? 200px : 150px);
 
-		// if root.width > 500px: DisplayBox {
-		// 	SideBar { y: 0; list: SlintState.playlist; }
-		// }
+		if root.width > 500px: DisplayBox {
+			SideBar { y: 0; list: SlintState.playlist; }
+		}
 
 		MainList {
 			min-width: parent.width * 0.6;
