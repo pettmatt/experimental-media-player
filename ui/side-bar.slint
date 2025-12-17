@@ -1,5 +1,5 @@
 import { HorizontalBox, VerticalBox } from "std-widgets.slint";
-import { SlintPlaylist } from "data-flow.slint";
+import { SlintPlaylist, ContextMenuActions } from "data-flow.slint";
 
 component Playlist {
 	accessible-role: none;
@@ -8,10 +8,10 @@ component Playlist {
 	in property <SlintPlaylist> data;
 
 	HorizontalBox {
-		Image {
+		// Image {
 			// height: 100%;
 			// source: @image-url(data.image_url);
-		}
+		// }
 
 		VerticalBox {
 			Text {
@@ -19,7 +19,7 @@ component Playlist {
 			}
 
 			Text {
-				text: @tr("Source: {}", data.sources.length > 1 
+				text: @tr("Source: {}", data.sources.length > 1
 					? @tr("mixed ({})", data.sources.length)
 					: data.sources[0]
 				);
@@ -32,6 +32,20 @@ export component SideBar {
 	in property <[SlintPlaylist]> list;
 
 	VerticalBox {
+		Text {
+			text: "Placeholder";
+
+			// Context menu needs to be a child of clickable element
+			ContextMenuArea {
+		        Menu {
+		            MenuItem {
+		                title: @tr("Create a new playlist");
+		                activated => { ContextMenuActions.create_new_playlist(); }
+		            }
+		        }
+		    }
+		}
+
 		for data in list: Playlist {
 			data: data;
 			height: 30px;

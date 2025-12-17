@@ -55,10 +55,13 @@ export global MediaActions {
 	callback media_mix();
 	callback add_to_playlist(int, int);
 
-	// Media track
 	callback media_change_track_position(int);
 	callback media_get_track_position();
 	callback media_change_volume(int);
+}
+
+export global ContextMenuActions {
+	callback create_new_playlist();
 }
 
 export enum MainView { index, playlist, queue, artist, online_source_result }
