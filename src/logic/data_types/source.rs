@@ -48,6 +48,7 @@ impl GetQuery for Source {
 				VALUES (?, ?);
 			"),
 			SqlQueries::Select => String::from("SELECT * FROM sources;"),
+			SqlQueries::SelectByRelation => String::from(""),
 			SqlQueries::Update => String::from("
 				UPDATE sources
 				SET
@@ -56,6 +57,7 @@ impl GetQuery for Source {
 				WHERE path = (path)
 				VALUES (?, ?);
 			"),
+			SqlQueries::UpdateRelations => String::from(""),
 			SqlQueries::Delete => String::from("
 				DELETE FROM sources WHERE path = (path)
 				VALUES (?);

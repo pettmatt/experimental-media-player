@@ -86,13 +86,16 @@ impl rusqlite::ToSql for Track {
 impl GetQuery for Track {
     fn get_query(&self, query: SqlQueries) -> String {
         match query {
-            SqlQueries::Insert => String::from(
-                "
-					INSERT INTO tracks (name, artists, path, extension, file_size, duration, playing)
-					VALUES (?, ?, ?, ?, ?, ?, ?);
-				",
-            ),
+            SqlQueries::Insert => String::from("
+				INSERT INTO tracks (name, artists, path, extension, file_size, duration, playing)
+				VALUES (?, ?, ?, ?, ?, ?, ?);
+			",),
             SqlQueries::Select => String::from("SELECT * FROM tracks;"),
+    		SqlQueries::SelectByRelation => String::from("
+				SELECT * FROM tracks
+				WHERE (property) = (value)
+				VALUES (?, ?);
+			"),
  			SqlQueries::Update => String::from("
 				UPDATE tracks
 				SET
@@ -106,6 +109,7 @@ impl GetQuery for Track {
 				WHERE id = (id)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?);
     		"),
+			SqlQueries::UpdateRelations => String::from(""),
 			SqlQueries::Delete => String::from("
 				DELETE FROM tracks WHERE id = (id)
 				VALUES (?);

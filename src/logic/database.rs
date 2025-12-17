@@ -45,6 +45,37 @@ pub fn initialize_tables() -> Result<(), ()> {
     if let Ok(connection) = connect() {
         let queries = [
             "PRAGMA foreign_keys = ON;",
+            "CREATE TABLE IF NOT EXISTS playlists (
+				id			INTEGER PRIMARY KEY AUTOINCREMENT,
+				type		TEXT NOT NULL,
+				name		TEXT NOT NULL,
+				sources		TEXT,
+				image_url	TEXT,
+				tracks		TEXT,
+				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
+				listened_at	DATETIME DEFAULT (datetime('now', 'localtime')),
+				track_id	INTEGER,
+				FOREIGN KEY(track_id) REFERENCES tracks(id) ON DELETE SET NULL
+			);",
+		   "CREATE TABLE IF NOT EXISTS sources (
+				id			INTEGER PRIMARY KEY AUTOINCREMENT,
+				origin 		TEXT NOT NULL,
+				path 		TEXT NOT NULL UNIQUE,
+				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
+        	"CREATE TABLE IF NOT EXISTS session (
+				id			INTEGER PRIMARY KEY AUTOINCREMENT,
+				track_id	INTEGER NOT NULL,
+				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
+            "CREATE TABLE IF NOT EXISTS settings (
+				id			INTEGER PRIMARY KEY AUTOINCREMENT,
+				name		TEXT NOT NULL,
+				value		TEXT,
+				default_value	TEXT,
+				updated_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
+				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
             "CREATE TABLE IF NOT EXISTS tracks (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				name 		TEXT NOT NULL,
@@ -54,36 +85,20 @@ pub fn initialize_tables() -> Result<(), ()> {
 				file_size 	INTEGER,
 				duration	INTEGER,
 				playing		INTEGER NOT NULL,
-				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
+				created 	DATETIME DEFAULT (datetime('now', 'localtime')),
+				source_id	INTEGER,
+				playlist_id	INTEGER,
+				session_id	INTEGER,
+				FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE SET NULL,
+				FOREIGN KEY(playlist_id) REFERENCES playlists(id) ON DELETE SET NULL,
+				FOREIGN KEY(session_id) REFERENCES session(id) ON DELETE SET NULL
 			);",
-            "CREATE TABLE IF NOT EXISTS sources (
-				id			INTEGER PRIMARY KEY AUTOINCREMENT,
-				origin 		TEXT NOT NULL,
-				path 		TEXT NOT NULL UNIQUE,
-				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
-			);",
-            "CREATE TABLE IF NOT EXISTS session (
-				id			INTEGER PRIMARY KEY AUTOINCEMENT,
-				track_id	INTEGER NOT NULL,
-				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
-			);",
-            "CREATE TABLE IF NOT EXISTS playlists (
-				id			INTEGER PRIMARY KEY AUTOINCEMENT,
-				type		TEXT NOT NULL,
-				name		TEXT NOT NULL,
-				sources		TEXT,
-				image_url	TEXT,
-				tracks		TEXT,
-				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
-				listened_at	DATETIME DEFAULT (datetime('now', 'localtime'))
-			);",
-            "CREATE TABLE IF NOT EXISTS settings (
-				id			INTEGER PRIMARY KEY AUTOINCEMENT,
-				name		TEXT NOT NULL,
-				value		TEXT,
-				default		TEXT,
-				updated_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
-				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			"CREATE playlist_tracks (
+				playlist_id INTEGER NOT NULL,
+				track_id INTEGER NOT NULL,
+				PRIMARY KEY (playlist_id, track_id),
+				FOREIGN KEY (playlist_id) REFERENCES playlist(id) ON DELETE CASCADE,
+				FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
 			);",
         ];
 

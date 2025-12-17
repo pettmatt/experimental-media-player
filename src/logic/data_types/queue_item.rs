@@ -41,7 +41,9 @@ impl GetQuery for QueueItem {
 				VALUES (?);
 			"),
 			SqlQueries::Select => String::from("SELECT * FROM queue;"),
+			SqlQueries::SelectByRelation => String::from(""),
 			SqlQueries::Update => String::from(""),
+			SqlQueries::UpdateRelations => String::from(""),
 			SqlQueries::Delete => String::from("
 				DELETE FROM session WHERE id = (id)
 				VALUES (?);
