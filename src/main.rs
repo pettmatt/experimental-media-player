@@ -93,10 +93,12 @@ impl State {
 			.map(|t| {
 				slint_generatedAppWindow::SlintTrack {
 					id: t.id,
-					artists: t.artists.into(),
-					extension: t.extension.into(),
-					name: t.name.into(),
+					artist: t.artist.into(),
+					title: t.title.into(),
 					path: t.path.into(),
+					genre: t.genre.into(),
+					year: t.year.into(),
+					extension: t.extension.into(),
 					duration: t.duration,
 					file_size: t.file_size,
 					playing: t.playing,

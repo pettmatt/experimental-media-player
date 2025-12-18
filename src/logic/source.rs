@@ -1,14 +1,11 @@
 use crate::logic::data_types::{source::Source, track::Track};
-
 use super::{
     custom::ErrorHandler,
 };
-use lofty::file::AudioFile;
+use lofty::{self, file::TaggedFileExt, file::AudioFile, probe::Probe, tag::Accessor};
 use native_dialog::DialogBuilder;
 use std::{
-    fmt::Error,
-    fs,
-    path::{Path, PathBuf},
+    borrow::Cow, fmt::Error, fs, path::{Path, PathBuf}
 };
 
 pub fn new_local_source() -> Option<PathBuf> {
@@ -48,42 +45,62 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
                 .and_then(|ext| ext.to_str())
                 .unwrap_or("unknown_extension");
 
-            let mime_type = match file_extension {
-                "ogg" => Some("audio/ogg"),
-                "mp3" => Some("audio/mpeg"),
-                "mp4" => Some("video/mp4"),
-                "webm" => Some("video/webm"),
-                _ => None,
-            };
+            // let mime_type = match file_extension {
+            //     "ogg" => Some("audio/ogg"),
+            //     "mp3" => Some("audio/mpeg"),
+            //     "mp4" => Some("video/mp4"),
+            //     "webm" => Some("video/webm"),
+            //     _ => None,
+            // };
 
             let duration = match file_extension {
-                "ogg" => read_audio_file(Path::new(&entry_path)),
-                "mp3" => read_audio_file(Path::new(&entry_path)),
+                "ogg" => get_duration(Path::new(&entry_path)),
+                "vorbis" => get_duration(Path::new(&entry_path)),
+                "mp3" => get_duration(Path::new(&entry_path)),
+                "flac" => get_duration(Path::new(&entry_path)),
+                "aac" => get_duration(Path::new(&entry_path)),
+                "aiff" => get_duration(Path::new(&entry_path)),
                 _ => None,
             };
 
-            if mime_type.is_some() {
-                // let name_array: Vec<&str> = file_name.split(".").collect();
-                // let audio_name = name_array[0];
-                let id = list.len() as i32;
-                let path = format!("{:?}", entry_path);
-                let artists = String::from("unknown");
+            let path = entry_path.to_string_lossy().to_string();
+            let id = list.len() as i32;
+            let mut artist = "unknown".to_string();
+            let mut title = "".to_string();
+            let mut genre = "".to_string();
+            let mut album = None;
+            let mut year = 0;
 
-                if let Some(d) = duration {
-                    list.push(Track {
-                        id,
-                        artists,
-                        name: file_name,
-                        extension: file_extension.to_string(),
-                        path,
-                        file_size,
-                        duration: d.as_secs_f32() as i32,
-                        playing: false,
-                    });
+            let file_tag = Probe::open(&path).unwrap().read().unwrap();
+            if let Some(tag) = file_tag.primary_tag() {
+            	let default = Cow::Borrowed("???");
+            	artist = tag.artist().unwrap_or(default.clone()).to_string();
+             	title = tag.title().unwrap_or(default.clone()).to_string();
+              	genre = tag.genre().unwrap_or(default.clone()).to_string();
+
+              	if let Some(a) = tag.album() {
+               		album = Some(a);
+                 	// Todo: Create new album playlist if album is found
+               	}
+
+               	if let Some(y) = tag.year() {
+                	year = y;
                 }
-            } else {
-                println!("Unknown mime_type: {:?}", mime_type);
-                println!("Unhandled file_extension: {:?}", file_extension);
+            }
+
+            if let Some(d) = duration {
+                list.push(Track {
+                    id,
+                    artist,
+                    title,
+                    genre,
+                    year,
+                    extension: file_extension.to_string(),
+                    path,
+                    file_size,
+                    duration: d.as_secs_f32() as i32,
+                    playing: false,
+                });
             }
         }
     }
@@ -112,7 +129,7 @@ pub fn validate_sources(source_list: Vec<Source>) -> Result<Vec<Track>, ErrorHan
     Ok(file_list)
 }
 
-fn read_audio_file(path: &Path) -> Option<core::time::Duration> {
+fn get_duration(path: &Path) -> Option<core::time::Duration> {
     if let Ok(file) = lofty::read_from_path(path) {
         let duration = file.properties().duration();
         return Some(duration);

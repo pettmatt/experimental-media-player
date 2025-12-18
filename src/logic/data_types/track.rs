@@ -4,9 +4,11 @@ use rusqlite::{Row, ToSql};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Track {
     pub id: i32,
-    pub name: String,
-    pub artists: String,
+    pub title: String,
+    pub artist: String,
     pub path: String,
+    pub genre: String,
+    pub year: u32,
     pub extension: String,
     pub duration: i32,
     pub file_size: i32,
@@ -17,10 +19,12 @@ impl std::fmt::Display for Track {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}, {}, {}, {}, {}, {}, {}",
-            self.name,
-            self.artists,
+            "{}, {}, {}, {}, {}, {}, {}, {}, {}",
+            self.title,
+            self.artist,
             self.path,
+            self.genre,
+            self.year,
             self.extension,
             self.duration,
             self.file_size,
@@ -33,9 +37,11 @@ impl Instanceable for Track {
     fn new() -> Self {
         Self {
             id: 0,
-            name: "".to_string(),
-            artists: "".to_string(),
+            title: "".to_string(),
+            artist: "".to_string(),
             path: "".to_string(),
+            genre: "".to_string(),
+            year: 0,
             extension: "".to_string(),
             file_size: 0,
             duration: 0,
@@ -46,25 +52,26 @@ impl Instanceable for Track {
 
 impl FromRow for Track {
     fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-    	let artists_string: String = row.get("artists")?;
-     	let artists_temp: Vec<&str> = artists_string.split(", ").collect();
-      	let artists = artists_temp.into_iter().map(|s| s.to_string()).collect();
-
         let mut file = Self {
             id: row.get("id")?,
-            name: row.get("name")?,
-            artists: artists,
+            title: row.get("title")?,
+            artist: row.get("artist")?,
             path: row.get("path")?,
+            genre: row.get("genre")?,
+            year: row.get("year")?,
             extension: row.get("extension")?,
             file_size: row.get("file_size")?,
             duration: row.get("duration")?,
             playing: row.get("playing")?,
         };
 
-        let mut path_array: Vec<&str> = file.path.split('"').collect();
-        path_array.remove(0);
-        path_array.remove(path_array.len() - 1);
-        file.path = path_array.concat();
+        // Used to remove unnecessary '"' from string. Could be added to State as get_path() method.
+        // TODO: Remove if commenting out doesn't break anything.
+        // let mut path_array: Vec<&str> = file.path.split('"').collect();
+        // println!("PATH ARRAY: {:?}", path_array);
+        // path_array.remove(0);
+        // path_array.remove(path_array.len() - 1);
+        // file.path = path_array.concat();
 
         Ok(file)
     }
@@ -87,7 +94,7 @@ impl GetQuery for Track {
     fn get_query(&self, query: SqlQueries) -> String {
         match query {
             SqlQueries::Insert => String::from("
-				INSERT INTO tracks (name, artists, path, extension, file_size, duration, playing)
+				INSERT INTO tracks (title, artist, path, extension, file_size, duration, playing)
 				VALUES (?, ?, ?, ?, ?, ?, ?);
 			",),
             SqlQueries::Select => String::from("SELECT * FROM tracks;"),
@@ -99,8 +106,8 @@ impl GetQuery for Track {
  			SqlQueries::Update => String::from("
 				UPDATE tracks
 				SET
-					name = (name),
-					artists = (artists),
+					title = (title),
+					artist = (artist),
 					path = (path),
 					extension = (extension),
 					file_size = (file_size),
@@ -121,8 +128,8 @@ impl GetQuery for Track {
 impl ToSqlParams for Track {
     fn to_sql_params(&self) -> Vec<&dyn ToSql> {
         vec![
-            &self.name as &dyn ToSql,
-            &self.artists as &dyn ToSql,
+            &self.title as &dyn ToSql,
+            &self.artist as &dyn ToSql,
             &self.path as &dyn ToSql,
             &self.extension as &dyn ToSql,
             &self.file_size as &dyn ToSql,
