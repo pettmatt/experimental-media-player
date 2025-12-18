@@ -3,10 +3,8 @@
 
 use std::{cell::RefCell, error::Error, rc::Rc, time::{UNIX_EPOCH}};
 use logic::{data_types::{track::Track, queue_item::QueueItem, playlist::Playlist}, ui_events as ui};
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
-
-use crate::logic::data_types::playlist::AudioEntry;
-
+use slint::{ComponentHandle, ModelRc, SharedString};
+use crate::logic::{data_types::playlist::AudioEntry};
 mod logic;
 
 slint::include_modules!();
@@ -63,20 +61,7 @@ impl State {
 		globals.set_queue(ModelRc::from(&media_queue[..]));
 	}
 
-	fn set_new_playlist(&mut self, name: String, image_url: String, globals: &SlintState) {
-		let new_entry = Playlist {
-			id: 0,
-			name,
-			sources: Vec::new(),
-			image_url,
-			created_at: "".to_string(),
-			listened_at: "".to_string(),
-			tracks: Vec::new(),
-			_audio_list_string: String::new(),
-			_sources_string: String::new(),
-		};
-
-		self.playlists.push(new_entry);
+	fn set_new_playlist(&mut self, globals: &SlintState) {
 		let playlists: Vec<SlintPlaylist> = self.convert_playlist_to_slint();
 		globals.set_playlist(ModelRc::from(&playlists[..]));
 	}

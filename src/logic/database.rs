@@ -47,7 +47,7 @@ pub fn initialize_tables() -> Result<(), ()> {
             "PRAGMA foreign_keys = ON;",
             "CREATE TABLE IF NOT EXISTS playlists (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
-				type		TEXT NOT NULL,
+				list_type	TEXT NOT NULL,
 				name		TEXT NOT NULL,
 				sources		TEXT,
 				image_url	TEXT,
@@ -100,6 +100,13 @@ pub fn initialize_tables() -> Result<(), ()> {
 				FOREIGN KEY (playlist_id) REFERENCES playlist(id) ON DELETE CASCADE,
 				FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
 			);",
+			"CREATE playlist_sources (
+				playlist_id INTEGER NOT NULL,
+				source_id INTEGER NOT NULL,
+				PRIMARY KEY (playlist_id, source_id),
+				FOREIGN KEY (playlist_id) REFERENCES playlist(id) ON DELETE CASCADE,
+				FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
+			);",
         ];
 
         let mut index = 0;
@@ -147,14 +154,15 @@ pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instancea
 pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(new_record: T)
 -> Result<(), ()> {
     if let Ok(connection) = connect() {
-        if connection.execute(
-                &new_record.get_query(SqlQueries::Insert),
-                new_record.to_sql_params().as_slice(),
-        ).is_err() {
+        if let Err(error) = connection.execute(
+            &new_record.get_query(SqlQueries::Insert),
+            new_record.to_sql_params().as_slice(),
+        ) {
             println!(
                 "Failed to execute add_record: {:?}; {:?}",
                 new_record, connection
             );
+            println!("Raw error: {:?}", error);
             return Err(());
         };
 

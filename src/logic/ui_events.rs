@@ -4,8 +4,8 @@ use crate::logic::data_types::track::Track;
 use crate::logic::database;
 use crate::logic::queue::Queue;
 use crate::logic::validate_sources;
-use crate::{AppWindow, MediaActions, SettingActions, SlintState, State};
-use slint::ComponentHandle;
+use crate::{AppWindow, ContextMenuActions, MediaActions, SettingActions, SlintPlaylist, SlintState, State};
+use slint::{ComponentHandle, ModelRc};
 use std::{cell::RefCell, rc::Rc};
 
 pub fn handle_initialization(state: &mut State) {
@@ -41,6 +41,7 @@ pub fn handle_passing_values(app: &AppWindow, state: &mut State) {
 pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
     let player = Rc::new(RefCell::new(MediaPlayer::new()));
     let global_setting_actions = app.global::<SettingActions>();
+    let global_context_menu_actions = app.global::<ContextMenuActions>();
     let global_media_actions = app.global::<MediaActions>();
     let weak_app = app.as_weak();
 
@@ -150,35 +151,10 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
             audio_control_events::handle_media_mix(&player_clone);
         }
     });
-
-    // Settings
-    global_setting_actions.on_new_local_source({
-        let state_clone = Rc::clone(state);
-        move || {
-            let source: Option<std::path::PathBuf> = source::new_local_source();
-            match source {
-                Some(source) => {
-                    {
-                        let path_string = source.clone().to_str().unwrap().to_string();
-                        database::add_record(Source {
-                            origin: String::from("local"),
-                            path: path_string,
-                        });
-                    }
-
-                    println!("Directory fetched correctly {:?}", source);
-                    let records = source::read_source(source).expect("Couldn't fetch all files");
-                    database::add_records(records.clone());
-                    state_clone.borrow_mut().merge_to_index(records);
-                }
-                None => println!("Didn't receive a path. Result should be None: {:?}", source),
-            }
-        }
-    });
-
     global_media_actions.on_add_to_playlist({
         let app_clone = weak_app.clone();
         let state_clone = Rc::clone(state);
+
         move |playlist_id: i32, media_id: i32| {
             if let Some(app) = app_clone.upgrade() {
                 state_clone.borrow_mut().add_to_playlist(
@@ -189,13 +165,77 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
             }
         }
     });
+
+    global_setting_actions.on_new_local_source({
+        let state_clone = Rc::clone(state);
+
+        move || {
+            let source: Option<std::path::PathBuf> = source::new_local_source();
+            match source {
+                Some(source) => {
+                    {
+                        let path_string = source.clone().to_str().unwrap().to_string();
+                        database::add_record(Source {
+                            origin: String::from("local"),
+                            path: path_string,
+                        });
+
+                        // TODO: Add logic that goes through the errors and checks if the track has been replaced.
+                        // Example 1: Artist 1 track 1 is replaced with Artist 2 track 1, with the same name.
+                        // If we can't find Artist 1's track 1, we can remove it from the db and add Artist 2's track 1 without a problem.
+                        // Example 2: If the program scans and check the db doesn't include old tracks before adding new tracks, we can prevent the unique path error.
+                    }
+
+                    println!("Directory fetched correctly {:?}", source);
+                    let records = source::read_source(source).expect("Couldn't fetch all files");
+                    if database::add_records(records.clone()).is_ok() {
+                    	state_clone.borrow_mut().merge_to_index(records);
+                    }
+                }
+                None => println!("Didn't receive a path. Result should be None: {:?}", source),
+            }
+        }
+    });
+
+    global_context_menu_actions.on_create_new_playlist({
+    	use crate::Playlist;
+     	let app_clone = weak_app.clone();
+    	let state_clone = Rc::clone(state);
+
+     	move || {
+      		let playlists = database::get_table::<Playlist>();
+        	let playlist_count = if playlists.is_ok() {
+         		playlists.unwrap().len() + 1
+        	} else { 0 };
+         	let name = format!("Playlist {playlist_count}");
+
+			let new_entry = Playlist {
+				id: 0,
+				name,
+				list_type: "playlist".to_string(),
+				sources: Vec::new(),
+				image_url: "".to_string(),
+				created_at: "".to_string(),
+				listened_at: "".to_string(),
+				tracks: Vec::new()
+			};
+
+			if database::add_record(new_entry.clone()).is_ok() {
+				state_clone.borrow_mut().playlists.push(new_entry);
+				if let Some(app) = app_clone.upgrade() {
+					let global_state = app.global::<SlintState>();
+					state_clone.borrow_mut().set_new_playlist(&global_state);
+				}
+			};
+      	}
+    })
 }
 
 pub mod audio_control_events {
     use crate::{
         logic::{
             audio::test::MediaPlayer,
-            data_types::{track::Track, queue_item::QueueItem}
+            data_types::track::Track
         },
         State,
     };
