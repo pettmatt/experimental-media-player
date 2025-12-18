@@ -122,8 +122,8 @@ pub fn initialize_tables() -> Result<(), ()> {
     Err(())
 }
 
-pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instanceable>(
-) -> Result<Vec<T>, ErrorHandler> {
+pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instanceable>()
+-> Result<Vec<T>, ErrorHandler> {
     match connect() {
         Ok(connection) => {
             let mut list: Vec<T> = Vec::new();
@@ -144,7 +144,8 @@ pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instancea
     }
 }
 
-pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(new_record: T) {
+pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(new_record: T)
+-> Result<(), ()> {
     if let Ok(connection) = connect() {
         if connection.execute(
                 &new_record.get_query(SqlQueries::Insert),
@@ -154,8 +155,13 @@ pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>
                 "Failed to execute add_record: {:?}; {:?}",
                 new_record, connection
             );
+            return Err(());
         };
+
+        return Ok(());
     }
+
+    Err(())
 }
 
 #[derive(std::fmt::Debug)]
@@ -166,9 +172,7 @@ struct ErrorBody {
 
 pub fn add_records<
     T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams + Convertable,
->(
-    new_records: Vec<T>,
-) {
+>(new_records: Vec<T>) -> Result<(), ()> {
     if let Ok(connection) = connect() {
         let mut result: HashMap<usize, ErrorBody> = HashMap::new();
 
@@ -194,17 +198,28 @@ pub fn add_records<
         }
 
         println!("Failure Hashmap: {:?}", result);
+        return Ok(());
     }
+
+    Err(())
 }
 
 pub fn update_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
     new_records: Vec<T>,
-) {
-    if let Ok(connection) = connect() {}
+) -> Result<(), ()> {
+    if let Ok(connection) = connect() {
+    	return Ok(());
+    }
+
+    Err(())
 }
 
 pub fn delete_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
     record_ids: Vec<i32>,
-) {
-    if let Ok(connection) = connect() {}
+) -> Result<(), ()> {
+    if let Ok(connection) = connect() {
+    	return Ok(());
+    }
+
+    Err(())
 }
