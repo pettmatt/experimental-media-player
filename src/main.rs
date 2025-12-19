@@ -1,31 +1,13 @@
 // Prevent console window in addition to Slint window in Windows release builds when, e.g., starting the app via file manager. Ignored on other platforms.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{cell::RefCell, error::Error, rc::Rc, time::{UNIX_EPOCH}};
-use logic::{data_types::{track::Track, queue_item::QueueItem, playlist::Playlist}, ui_events as ui};
+use std::{cell::RefCell, error::Error, rc::Rc};
+use logic::ui_events as ui;
 use slint::{ComponentHandle, ModelRc, SharedString};
-use crate::logic::{data_types::playlist::AudioEntry};
+use crate::logic::{data_types::{playlist::{AudioEntry, Playlist}, queue_item::QueueItem, track::Track}, slint::convert_to_slint_model};
 mod logic;
 
 slint::include_modules!();
-
-#[derive(Clone, Debug, Default)]
-struct TimeLine {
-	current: i32,
-	length: i32,
-	media_index: Option<usize>,
-	queue_index: Option<usize>,
-}
-
-#[derive(Clone, Debug, Default)]
-struct State {
-	index: Vec<Track>,
-	queue: Vec<QueueItem>, // Because Rodio doesn't offer frexible way to interact with the queue, we're managing by deleting the queue, whenever we want to make a change.
-	playing: TimeLine,
-	playlists: Vec<Playlist>,
-	// 	sources: Vec<String>,
-	// 	settings: Settings,
-}
 
 fn main() -> Result<(), Box<dyn Error>> {
 	let app = AppWindow::new()?;
@@ -38,6 +20,35 @@ fn main() -> Result<(), Box<dyn Error>> {
     app.run()?;
 
     Ok(())
+}
+
+#[derive(Clone, Debug, Default)]
+struct TimeLine {
+	current: i32,
+	length: i32,
+	media_index: Option<usize>,
+	queue_index: Option<usize>,
+}
+
+impl TimeLine {
+	pub fn update_timeline(&mut self, track: &Track) {
+		self.length = track.duration;
+		self.current = 0;
+	}
+
+	pub fn update_position(&mut self, value: i32) {
+		self.current = value;
+	}
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct State {
+	index: Vec<Track>,
+	queue: Vec<QueueItem>, // Because Rodio doesn't offer frexible way to interact with the queue, we're managing by deleting the queue, whenever we want to make a change.
+	playing: TimeLine,
+	playlists: Vec<Playlist>,
+	// 	sources: Vec<String>,
+	// 	settings: Settings,
 }
 
 impl State {
@@ -72,7 +83,7 @@ impl State {
 
 		if let Some(p) = playlist {
 			let now = std::time::SystemTime::now();
-			let since = now.duration_since(UNIX_EPOCH);
+			let since = now.duration_since(std::time::UNIX_EPOCH);
 
 			if let Ok(duration) = since {
 				let new_entry = AudioEntry {
@@ -167,12 +178,12 @@ impl State {
 		self.index.iter().enumerate().find(|(_, media)| media.id == id)
 	}
 
-	pub fn merge_to_index(&mut self, records: Vec<Track>) {
+	pub fn merge_state<T: >(&mut self, records: Vec<Track>) {
 		let merged = self.index.clone();
     	self.index.extend(records.into_iter().filter(|item| !merged.contains(item)));
 	}
 
-	fn set_index_playing(&mut self, index: usize, value: bool) -> Option<()> {
+	pub fn set_index_playing(&mut self, index: usize, value: bool) -> Option<()> {
 		if let Some(queue_item) = self.queue.get(index) {
 			if let Some((media_index, _)) = self.find_source_by_id(queue_item.track_id) {
 				self.index[media_index].playing = value;
@@ -187,30 +198,5 @@ impl State {
 		}
 
 		None
-	}
-}
-
-impl From<AudioEntry> for (SharedString, i32) {
-    fn from(entry: AudioEntry) -> Self {
-        (SharedString::from(entry.added_at), entry.id)
-    }
-}
-
-fn convert_to_slint_model<T, E>(vec: Vec<T>) -> ModelRc<E>
-where
-	E: From<T> + Clone + 'static
-{
-	let slint_vec: Vec<E> = vec.into_iter().map(|item| E::from(item)).collect();
-    ModelRc::new(slint::VecModel::from(slint_vec))
-}
-
-impl TimeLine {
-	pub fn update_timeline(&mut self, track: &Track) {
-		self.length = track.duration;
-		self.current = 0;
-	}
-
-	pub fn update_position(&mut self, value: i32) {
-		self.current = value;
 	}
 }
