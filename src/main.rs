@@ -57,9 +57,8 @@ impl State {
 			self.index = i;
 		}
 
-		let media_items = self.convert_index();
-		globals.set_index(ModelRc::from(&media_items[..]));
-		println!("(State) Index state updated. {:?}", self.index);
+		let index: Vec<SlintTrack> = self.convert_index();
+		globals.set_index(ModelRc::from(&index[..]));
 	}
 
 	pub fn set_queue(&mut self, queue: Option<Vec<QueueItem>>, globals: &SlintState) {
@@ -178,7 +177,7 @@ impl State {
 		self.index.iter().enumerate().find(|(_, media)| media.id == id)
 	}
 
-	pub fn merge_state<T: >(&mut self, records: Vec<Track>) {
+	pub fn merge_to_index(&mut self, records: Vec<Track>) {
 		let merged = self.index.clone();
     	self.index.extend(records.into_iter().filter(|item| !merged.contains(item)));
 	}

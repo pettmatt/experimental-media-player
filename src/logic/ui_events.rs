@@ -168,6 +168,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 
     global_setting_actions.on_new_local_source({
         let state_clone = Rc::clone(state);
+        let app_clone = weak_app.clone();
 
         move || {
             let source: Option<std::path::PathBuf> = source::new_local_source();
@@ -187,10 +188,18 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
                     }
 
                     println!("Directory fetched correctly {:?}", source);
+                    // if database::add_records(records.clone()).is_ok() {
+                    // 	state_clone.borrow_mut().merge_to_index(records);
+                    // }
+
                     let records = source::read_source(source).expect("Couldn't fetch all files");
-                    if database::add_records(records.clone()).is_ok() {
-                    	state_clone.borrow_mut().merge_to_index(records);
-                    }
+         			if database::add_records(records.clone()).is_ok() {
+            			state_clone.borrow_mut().merge_to_index(records);
+						if let Some(app) = app_clone.upgrade() {
+							let global_state = app.global::<SlintState>();
+							state_clone.borrow_mut().set_index(None, &global_state);
+						}
+					};
                 }
                 None => println!("Didn't receive a path. Result should be None: {:?}", source),
             }
