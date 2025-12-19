@@ -97,7 +97,7 @@ impl State {
 					title: t.title.into(),
 					path: t.path.into(),
 					genre: t.genre.into(),
-					year: t.year.into(),
+					year: t.year as i32,
 					extension: t.extension.into(),
 					duration: t.duration,
 					file_size: t.file_size,
@@ -117,9 +117,11 @@ impl State {
 				if let Some((_, t)) = track {
 					return slint_generatedAppWindow::SlintTrack {
 						id: t.id,
-						name: t.name.clone().into(),
-						artists: t.artists.clone().into(),
+						title: t.title.clone().into(),
+						artist: t.artist.clone().into(),
 						path: t.path.clone().into(),
+						genre: t.genre.clone().into(),
+						year: t.year as i32,
 						extension: t.extension.clone().into(),
 						file_size: t.file_size,
 						duration: t.duration,
@@ -129,9 +131,11 @@ impl State {
 
 				slint_generatedAppWindow::SlintTrack {
 					id: i32::MAX,
-					name: SharedString::from(""),
-					artists: SharedString::from(""),
+					title: SharedString::from(""),
+					artist: SharedString::from(""),
 					path: SharedString::from(""),
+					genre: SharedString::from(""),
+					year: 0,
 					extension: SharedString::from(""),
 					file_size: 0,
 					duration: 0,
