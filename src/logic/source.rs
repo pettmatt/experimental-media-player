@@ -71,6 +71,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             let mut album = None;
             let mut year = 0;
 
+            // BUG: Unknown format creates issues
             let file_tag = Probe::open(&path).unwrap().read().unwrap();
             if let Some(tag) = file_tag.primary_tag() {
             	let default = Cow::Borrowed("???");
