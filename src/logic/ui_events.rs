@@ -222,6 +222,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 				id: 0,
 				name,
 				list_type: "playlist".to_string(),
+				artist: None,
 				sources: Vec::new(),
 				image_url: "".to_string(),
 				created_at: "".to_string(),

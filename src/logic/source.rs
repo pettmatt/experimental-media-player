@@ -1,11 +1,11 @@
-use crate::logic::data_types::{source::Source, track::Track};
+use crate::logic::{data_types::{playlist::Playlist, source::Source, track::Track}, database};
 use super::{
     custom::ErrorHandler,
 };
 use lofty::{self, file::TaggedFileExt, file::AudioFile, probe::Probe, tag::Accessor};
 use native_dialog::DialogBuilder;
 use std::{
-    borrow::Cow, fmt::Error, fs, path::{Path, PathBuf}
+    borrow::Cow, fmt::Error, fs, ops::Not, path::{Path, PathBuf}
 };
 
 pub fn new_local_source() -> Option<PathBuf> {
@@ -68,7 +68,6 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             let mut artist = "unknown".to_string();
             let mut title = "".to_string();
             let mut genre = "".to_string();
-            let mut album = None;
             let mut year = 0;
 
             // BUG: Unknown format creates issues
@@ -79,8 +78,29 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
              	title = tag.title().unwrap_or(default.clone()).to_string();
               	genre = tag.genre().unwrap_or(default.clone()).to_string();
 
-              	if let Some(a) = tag.album() {
-               		album = Some(a);
+              	if let Some(album_name) = tag.album() {
+               		let playlists = database::get_table::<Playlist>();
+
+                 	if let Ok(playlists) = playlists {
+                 		let album_exists: bool = playlists.iter().any(|pl| &pl.name == &album_name);
+                   		if album_exists.not() {
+                     		let album = Playlist {
+                       			id: 0,
+                          		name: album_name.to_string(),
+                            	list_type: "album".to_string(),
+                            	artist: Some(artist.clone()),
+                             	sources: Vec::new(),
+                              	image_url: "".to_string(),
+                               	created_at: "".to_string(),
+                                listened_at: "".to_string(),
+                                tracks: Vec::new()
+                            };
+
+                   			if let Err(()) = database::add_record::<Playlist>(album) {
+                   				println!("Failed to create new album \"{album_name}\".");
+                      		}
+                     	}
+                  	}
                  	// Todo: Create new album playlist if album is found
                	}
 
