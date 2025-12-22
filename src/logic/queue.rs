@@ -1,6 +1,6 @@
+use crate::{logic::data_types::{queue_item::QueueItem, track::Track}, State};
 use std::collections::HashMap;
 use rand::prelude::*;
-use crate::{logic::data_types::track::Track, QueueItem, State};
 
 pub trait Queue {
 	fn add_to_queue(&mut self, media: &Track);

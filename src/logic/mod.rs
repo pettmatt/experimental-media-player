@@ -7,6 +7,7 @@ pub mod database;
 pub mod queue;
 pub mod source;
 pub mod ui_events;
+pub mod slint;
 mod custom {
     use thiserror::Error;
 
