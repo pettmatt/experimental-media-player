@@ -13,6 +13,7 @@ pub struct Playlist {
 	pub id: i32,
 	pub name: String,
 	pub list_type: String,
+	pub artist: Option<String>,
 	pub sources: Vec<String>,
 	pub image_url: String,
 	pub created_at: String,
@@ -35,6 +36,7 @@ impl Instanceable for Playlist {
 			id: 0,
 			name: "".to_string(),
 			list_type: "".to_string(),
+			artist: None,
 			sources: Vec::new(),
 			image_url: "".to_string(),
 			created_at: "".to_string(),
@@ -53,6 +55,7 @@ impl FromRow for Playlist {
 			id: row.get("id")?,
 			list_type: row.get("list_type")?,
 			name: row.get("name")?,
+			artist: row.get("artist")?,
 			sources: serde_json::from_str(&sources).unwrap_or_default(),
 			image_url: row.get("image_url")?,
 			created_at: row.get("created_at")?,
@@ -82,28 +85,16 @@ impl GetQuery for Playlist {
 				VALUES (?, ?, ?, ?, ?);
 			"),
 			SqlQueries::Select => String::from("SELECT * FROM playlists;"),
-			SqlQueries::SelectByRelation => String::from("
-				SELECT * FROM playlists
-				JOIN playlist_tracks ON playlists.track_id = (track_id)
-				JOIN tracks ON tracks.playlist_id = (playlist_id)
-				WHERE (property) = (value)
-				VALUES (?, ?);
-			"),
 			SqlQueries::Update => String::from("
 				UPDATE playlists
 				SET
 					name = (name),
+					artist = (artist),
 					sources = (sources),
 					image_url = (image_url),
 					tracks = (tracks)
 				WHERE id = (id)
-				VALUES (?, ?, ?, ?, ?);
-			"),
-			SqlQueries::UpdateRelations => String::from("
-				UPDATE playlist_tracks
-				SET track_id = (track_id)
-				WHERE id = (id)
-				VALUES (?, ?);
+				VALUES (?, ?, ?, ?, ?, ?);
 			"),
 			SqlQueries::Delete => String::from("
 				DELETE FROM playlists WHERE id = (id)
@@ -123,8 +114,4 @@ impl ToSqlParams for Playlist {
 			&self.listened_at as &dyn ToSql,
 		]
 	}
-}
-
-impl Convertable for Playlist {
-	fn convert_to_string(&mut self) {}
 }

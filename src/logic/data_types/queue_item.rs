@@ -37,15 +37,13 @@ impl GetQuery for QueueItem {
 	fn get_query(&self, query: SqlQueries) -> String {
 		match query {
 			SqlQueries::Insert => String::from("
-				INSERT INTO session (track_id)
+				INSERT INTO sessions (track_id)
 				VALUES (?);
 			"),
-			SqlQueries::Select => String::from("SELECT * FROM queue;"),
-			SqlQueries::SelectByRelation => String::from(""),
+			SqlQueries::Select => String::from("SELECT * FROM sessions;"),
 			SqlQueries::Update => String::from(""),
-			SqlQueries::UpdateRelations => String::from(""),
 			SqlQueries::Delete => String::from("
-				DELETE FROM session WHERE id = (id)
+				DELETE FROM sessions WHERE id = (id)
 				VALUES (?);
 			"),
 		}

@@ -1,4 +1,4 @@
-use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -98,11 +98,6 @@ impl GetQuery for Track {
 				VALUES (?, ?, ?, ?, ?, ?, ?);
 			",),
             SqlQueries::Select => String::from("SELECT * FROM tracks;"),
-    		SqlQueries::SelectByRelation => String::from("
-				SELECT * FROM tracks
-				WHERE (property) = (value)
-				VALUES (?, ?);
-			"),
  			SqlQueries::Update => String::from("
 				UPDATE tracks
 				SET
@@ -116,7 +111,6 @@ impl GetQuery for Track {
 				WHERE id = (id)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?);
     		"),
-			SqlQueries::UpdateRelations => String::from(""),
 			SqlQueries::Delete => String::from("
 				DELETE FROM tracks WHERE id = (id)
 				VALUES (?);
