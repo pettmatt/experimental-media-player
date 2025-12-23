@@ -48,8 +48,7 @@ impl Instanceable for Playlist {
 
 impl FromRow for Playlist {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-		let audio_list: String = row.get("audio_list")?;
-
+		// TODO: Tracks and sources should be joined through the sql query
 		Ok(Self {
 			id: row.get("id")?,
 			list_type: row.get("list_type")?,
@@ -104,16 +103,11 @@ impl GetQuery for Playlist {
 
 impl ToSqlParams for Playlist {
 	fn to_sql_params(&self) -> Vec<&dyn ToSql> {
-		let mut params = vec![
+		vec![
 			&self.name as &dyn ToSql,
 			&self.list_type as &dyn ToSql,
 			&self.image_url as &dyn ToSql,
-		];
-
-		if self.artist.is_some() {
-			params.push(&self.artist as &dyn ToSql);
-		}
-
-		params
+			&self.artist as &dyn ToSql
+		]
 	}
 }

@@ -35,8 +35,8 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
                 list.extend(nf)
             }
         } else {
-            let file_name = entry.file_name().to_string_lossy().to_string();
-            println!("Entry_path {:?}", &entry_path);
+            // let file_name = entry.file_name().to_string_lossy().to_string();
+            // println!("Entry_path {:?}", &entry_path);
             let metadata = fs::metadata(&entry_path).expect("Couldn't get metadata");
             let file_size = metadata.len() as i32;
 
@@ -44,14 +44,6 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
                 .extension()
                 .and_then(|ext| ext.to_str())
                 .unwrap_or("unknown_extension");
-
-            // let mime_type = match file_extension {
-            //     "ogg" => Some("audio/ogg"),
-            //     "mp3" => Some("audio/mpeg"),
-            //     "mp4" => Some("video/mp4"),
-            //     "webm" => Some("video/webm"),
-            //     _ => None,
-            // };
 
             let duration = match file_extension {
                 "ogg" => get_duration(Path::new(&entry_path)),
@@ -71,42 +63,44 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             let mut year = 0;
 
             // BUG: Unknown format creates issues
-            let file_tag = Probe::open(&path).unwrap().read().unwrap();
-            if let Some(tag) = file_tag.primary_tag() {
-            	let default = Cow::Borrowed("???");
-            	artist = tag.artist().unwrap_or(default.clone()).to_string();
-             	title = tag.title().unwrap_or(default.clone()).to_string();
-              	genre = tag.genre().unwrap_or(default.clone()).to_string();
+            let file_tag_result = read_audio_file(&path);
+            if let Ok(file_tag) = file_tag_result {
+            	if let Some(tag) = file_tag.primary_tag() {
+	            	let default = Cow::Borrowed("???");
+	            	artist = tag.artist().unwrap_or(default.clone()).to_string();
+	             	title = tag.title().unwrap_or(default.clone()).to_string();
+	              	genre = tag.genre().unwrap_or(default.clone()).to_string();
 
-              	if let Some(album_name) = tag.album() {
-               		let playlists = database::get_table::<Playlist>();
+	              	if let Some(album_name) = tag.album() {
+	               		let playlists = database::get_table::<Playlist>();
 
-                 	if let Ok(playlists) = playlists {
-                 		let album_exists: bool = playlists.iter().any(|pl| &pl.name == &album_name);
-                   		if album_exists.not() {
-                     		let album = Playlist {
-                       			id: 0,
-                          		name: album_name.to_string(),
-                            	list_type: "album".to_string(),
-                            	artist: Some(artist.clone()),
-                              	image_url: "".to_string(),
-                               	created_at: "".to_string(),
-                                listened_at: "".to_string(),
-                             	sources: None,
-                                tracks: None
-                            };
+	                 	if let Ok(playlists) = playlists {
+	                 		let album_exists: bool = playlists.iter().any(|pl| &pl.name == &album_name);
+	                   		if album_exists.not() {
+	                     		let album = Playlist {
+	                       			id: 0,
+	                          		name: album_name.to_string(),
+	                            	list_type: "album".to_string(),
+	                            	artist: Some(artist.clone()),
+	                              	image_url: "".to_string(),
+	                               	created_at: "".to_string(),
+	                                listened_at: "".to_string(),
+	                             	sources: None,
+	                                tracks: None
+	                            };
 
-                   			if let Err(()) = database::add_record::<Playlist>(album) {
-                   				println!("Failed to create new album \"{album_name}\".");
-                      		}
-                     	}
-                  	}
-                 	// Todo: Create new album playlist if album is found
-               	}
+	                   			if let Err(()) = database::add_record::<Playlist>(album) {
+	                   				println!("Failed to create new album \"{album_name}\".");
+	                      		}
+	                     	}
+	                  	}
+	                 	// Todo: Create new album playlist if album is found
+	               	}
 
-               	if let Some(y) = tag.year() {
-                	year = y;
-                }
+	               	if let Some(y) = tag.year() {
+	                	year = y;
+	                }
+             	}
             }
 
             if let Some(d) = duration {
@@ -157,4 +151,9 @@ fn get_duration(path: &Path) -> Option<core::time::Duration> {
     }
 
     None
+}
+
+fn read_audio_file<P: AsRef<Path>>(path: P) -> Result<lofty::file::TaggedFile, Box<dyn std::error::Error>> {
+    let tag = Probe::open(&path)?.read()?;
+    Ok(tag)
 }

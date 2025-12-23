@@ -45,7 +45,7 @@ pub fn initialize_tables() -> Result<(), ()> {
     if let Ok(connection) = connect() {
         let queries = [
             "PRAGMA foreign_keys = ON;",
-		   "CREATE TABLE IF NOT EXISTS sources (
+            "CREATE TABLE IF NOT EXISTS sources (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				origin 		TEXT NOT NULL,
 				path 		TEXT NOT NULL UNIQUE,
@@ -65,7 +65,16 @@ pub fn initialize_tables() -> Result<(), ()> {
 				updated_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
-		   "CREATE TABLE IF NOT EXISTS tracks (
+		   	"CREATE TABLE IF NOT EXISTS playlists (
+				id			INTEGER PRIMARY KEY AUTOINCREMENT,
+				list_type	TEXT NOT NULL,
+				name		TEXT NOT NULL,
+				artist		TEXT,
+				image_url	TEXT,
+				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
+				listened_at	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
+		   	"CREATE TABLE IF NOT EXISTS tracks (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				title 		TEXT NOT NULL,
 				artist	 	TEXT NOT NULL,
@@ -76,22 +85,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 				file_size 	INTEGER,
 				duration	INTEGER,
 				playing		INTEGER NOT NULL,
-				created 	DATETIME DEFAULT (datetime('now', 'localtime')),
-				source_id	INTEGER,
-				playlist_id	INTEGER,
-				session_id	INTEGER,
-				FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE SET NULL,
-				FOREIGN KEY(playlist_id) REFERENCES playlists(id) ON DELETE SET NULL,
-				FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE SET NULL
-			);",
-            "CREATE TABLE IF NOT EXISTS playlists (
-				id			INTEGER PRIMARY KEY AUTOINCREMENT,
-				list_type	TEXT NOT NULL,
-				name		TEXT NOT NULL,
-				artist		TEXT,
-				image_url	TEXT,
-				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
-				listened_at	DATETIME DEFAULT (datetime('now', 'localtime')),
+				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
 			"CREATE TABLE IF NOT EXISTS playlist_tracks (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,14 +93,14 @@ pub fn initialize_tables() -> Result<(), ()> {
 				track_id INTEGER NOT NULL,
 				PRIMARY KEY (playlist_id, track_id),
 				FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
-				FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE,
+				FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
 			);",
 			"CREATE TABLE IF NOT EXISTS playlist_sources (
 				playlist_id INTEGER NOT NULL,
 				source_id INTEGER NOT NULL,
 				PRIMARY KEY (playlist_id, source_id),
 				FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
-				FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE,
+				FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE
 			);",
         ];
 

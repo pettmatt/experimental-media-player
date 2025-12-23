@@ -20,7 +20,7 @@ impl std::fmt::Display for Track {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}, {}, {}, {}, {}, {}, {}, {}, {}",
+            "{}, {}, {}, {:?}, {}, {}, {}, {}, {}",
             self.title,
             self.artist,
             self.path,
@@ -53,13 +53,16 @@ impl Instanceable for Track {
 
 impl FromRow for Track {
     fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut file = Self {
+    	let year = row.get("year").unwrap_or_else(|_| 0);
+     	let genre = row.get("genre").unwrap_or_else(|_| "".to_string());
+
+        let file = Self {
             id: row.get("id")?,
             title: row.get("title")?,
             artist: row.get("artist")?,
             path: row.get("path")?,
-            genre: row.get("genre")?,
-            year: row.get("year")?,
+            genre: genre,
+            year: year,
             extension: row.get("extension")?,
             file_size: row.get("file_size")?,
             duration: row.get("duration")?,
@@ -97,7 +100,7 @@ impl GetQuery for Track {
             SqlQueries::Insert => String::from("
 				INSERT INTO tracks (title, artist, path, extension, file_size, duration, playing)
 				VALUES (?, ?, ?, ?, ?, ?, ?);
-			",),
+			"),
             SqlQueries::Select => String::from("SELECT * FROM tracks;"),
  			SqlQueries::Update => String::from("
 				UPDATE tracks

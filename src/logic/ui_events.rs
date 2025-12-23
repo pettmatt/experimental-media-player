@@ -176,7 +176,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
                 Some(source) => {
                     {
                         let path_string = source.clone().to_str().unwrap().to_string();
-                        database::add_record(Source {
+                        let _ = database::add_record(Source {
                             origin: String::from("local"),
                             path: path_string,
                         });
@@ -238,7 +238,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 				}
 			};
       	}
-    })
+    });
 }
 
 pub mod audio_control_events {
