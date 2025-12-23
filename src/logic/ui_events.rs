@@ -221,13 +221,13 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
 			let new_entry = Playlist {
 				id: 0,
 				name,
-				list_type: "playlist".to_string(),
 				artist: None,
-				sources: Vec::new(),
+				list_type: "playlist".to_string(),
 				image_url: "".to_string(),
 				created_at: "".to_string(),
 				listened_at: "".to_string(),
-				tracks: Vec::new()
+				sources: None,
+				tracks: None,
 			};
 
 			if database::add_record(new_entry.clone()).is_ok() {

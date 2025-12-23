@@ -89,7 +89,14 @@ impl State {
 					id: media_id,
 					added_at: format!("{}", duration.as_secs()),
 				};
-				p.tracks.push(new_entry);
+
+				if p.tracks.is_none() {
+					p.tracks = Some(Vec::new())
+				}
+
+				if let Some(tracks) = p.tracks.as_mut() {
+					tracks.push(new_entry);
+				}
 			}
 
 			let playlists: Vec<SlintPlaylist> = self.convert_playlist_to_slint();
@@ -160,14 +167,25 @@ impl State {
 			.clone()
 			.into_iter()
 			.map(|p| {
+				let mut sources = Vec::new();
+				let mut tracks = Vec::new();
+
+				if let Some(s) = p.sources {
+					sources = s;
+				}
+
+				if let Some(t) = p.tracks {
+					tracks = t;
+				}
+
 				slint_generatedAppWindow::SlintPlaylist {
 					id: p.id,
 					name: SharedString::from(p.name),
-					sources: convert_to_slint_model(p.sources),
 					image_url: SharedString::from(p.image_url),
 					created_at: SharedString::from(p.created_at),
 					listened_at: SharedString::from(p.listened_at),
-					audio_list: convert_to_slint_model(p.tracks),
+					sources: convert_to_slint_model(sources),
+					tracks: convert_to_slint_model(tracks),
 				}
 			})
 			.collect()

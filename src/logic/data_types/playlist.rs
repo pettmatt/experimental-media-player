@@ -1,4 +1,4 @@
-use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{source::Source, Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
@@ -12,19 +12,19 @@ pub struct AudioEntry {
 pub struct Playlist {
 	pub id: i32,
 	pub name: String,
-	pub list_type: String,
 	pub artist: Option<String>,
-	pub sources: Vec<String>,
+	pub list_type: String,
 	pub image_url: String,
 	pub created_at: String,
 	pub listened_at: String,
-	pub tracks: Vec<AudioEntry>,
+	pub tracks: Option<Vec<AudioEntry>>,
+	pub sources: Option<Vec<Source>>,
 }
 
 impl std::fmt::Display for Playlist {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(
-			f, "{}, {:?}, {}, {}, {}, {:?}", self.name, self.sources, self.image_url,
+			f, "{}, {}, {}, {}, {:?}", self.name, self.image_url,
 			self.created_at, self.listened_at, self.tracks
 		)
 	}
@@ -37,18 +37,17 @@ impl Instanceable for Playlist {
 			name: "".to_string(),
 			list_type: "".to_string(),
 			artist: None,
-			sources: Vec::new(),
 			image_url: "".to_string(),
 			created_at: "".to_string(),
 			listened_at: "".to_string(),
-			tracks: Vec::new(),
+			tracks: None,
+			sources: None,
 		}
 	}
 }
 
 impl FromRow for Playlist {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-		let sources: String = row.get("sources")?;
 		let audio_list: String = row.get("audio_list")?;
 
 		Ok(Self {
@@ -56,11 +55,11 @@ impl FromRow for Playlist {
 			list_type: row.get("list_type")?,
 			name: row.get("name")?,
 			artist: row.get("artist")?,
-			sources: serde_json::from_str(&sources).unwrap_or_default(),
 			image_url: row.get("image_url")?,
 			created_at: row.get("created_at")?,
 			listened_at: row.get("listened_at")?,
-			tracks: serde_json::from_str(&audio_list).unwrap_or_default(),
+			tracks: None,
+			sources: None,
 		})
 	}
 }
@@ -81,23 +80,22 @@ impl GetQuery for Playlist {
 	fn get_query(&self, query: SqlQueries) -> String {
 		match query {
 			SqlQueries::Insert => String::from("
-				INSERT INTO playlists (name, list_type, image_url, created_at, listened_at)
-				VALUES (?, ?, ?, ?, ?);
+				INSERT INTO playlists (name, list_type, image_url, artist)
+				VALUES (?, ?, ?, ?);
 			"),
 			SqlQueries::Select => String::from("SELECT * FROM playlists;"),
 			SqlQueries::Update => String::from("
 				UPDATE playlists
 				SET
 					name = (name),
-					artist = (artist),
-					sources = (sources),
+					list = (list_type),
 					image_url = (image_url),
-					tracks = (tracks)
-				WHERE id = (id)
-				VALUES (?, ?, ?, ?, ?, ?);
+					artist = (artist),
+				WHERE name = (name)
+				VALUES (?, ?, ?, ?);
 			"),
 			SqlQueries::Delete => String::from("
-				DELETE FROM playlists WHERE id = (id)
+				DELETE FROM playlists WHERE name = (name)
 				VALUES (?);
 			"),
 		}
@@ -106,12 +104,16 @@ impl GetQuery for Playlist {
 
 impl ToSqlParams for Playlist {
 	fn to_sql_params(&self) -> Vec<&dyn ToSql> {
-		vec![
+		let mut params = vec![
 			&self.name as &dyn ToSql,
 			&self.list_type as &dyn ToSql,
 			&self.image_url as &dyn ToSql,
-			&self.created_at as &dyn ToSql,
-			&self.listened_at as &dyn ToSql,
-		]
+		];
+
+		if self.artist.is_some() {
+			params.push(&self.artist as &dyn ToSql);
+		}
+
+		params
 	}
 }

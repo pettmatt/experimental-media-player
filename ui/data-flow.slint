@@ -27,11 +27,14 @@ export struct SlintSettings {
 export struct SlintPlaylist {
 	id: int,
 	name: string,
-	sources: [string],
 	image_url: string,
 	created_at: string,
 	listened_at: string,
-	audio_list: [{
+	sources: [{
+		origin: string,
+		path: string,
+	}],
+	tracks: [{
 		id: int,
 		added_at: string,
 	}],

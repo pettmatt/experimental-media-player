@@ -21,7 +21,7 @@ component Playlist {
 			Text {
 				text: @tr("Source: {}", data.sources.length > 1
 					? @tr("mixed ({})", data.sources.length)
-					: data.sources[0]
+					: data.sources[0].path
 				);
 			}
 		}

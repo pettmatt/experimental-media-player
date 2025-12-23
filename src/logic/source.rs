@@ -89,11 +89,11 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
                           		name: album_name.to_string(),
                             	list_type: "album".to_string(),
                             	artist: Some(artist.clone()),
-                             	sources: Vec::new(),
                               	image_url: "".to_string(),
                                	created_at: "".to_string(),
                                 listened_at: "".to_string(),
-                                tracks: Vec::new()
+                             	sources: None,
+                                tracks: None
                             };
 
                    			if let Err(()) = database::add_record::<Playlist>(album) {

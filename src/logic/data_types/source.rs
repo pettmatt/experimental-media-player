@@ -1,7 +1,8 @@
 use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
 	pub origin: String,
 	pub path: String,

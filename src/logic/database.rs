@@ -90,11 +90,8 @@ pub fn initialize_tables() -> Result<(), ()> {
 				name		TEXT NOT NULL,
 				artist		TEXT,
 				image_url	TEXT,
-				tracks		TEXT,
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
 				listened_at	DATETIME DEFAULT (datetime('now', 'localtime')),
-				track_id	INTEGER,
-				FOREIGN KEY(track_id) REFERENCES tracks(id) ON DELETE SET NULL
 			);",
 			"CREATE TABLE IF NOT EXISTS playlist_tracks (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,6 +140,7 @@ pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instancea
             let mut statement = connection.prepare(&query)?;
             let iter = statement.query_map([], |row| {
             	println!("Row:: {:?}", row);
+             	println!("Query:: {:?}", query);
              	Ok(T::from_row(row).unwrap())
             })?;
 

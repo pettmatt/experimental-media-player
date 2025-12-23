@@ -1,9 +1,15 @@
+use crate::logic::data_types::{playlist::AudioEntry, source::Source};
 use slint::{ModelRc, SharedString};
-use crate::logic::data_types::playlist::AudioEntry;
 
 impl From<AudioEntry> for (SharedString, i32) {
     fn from(entry: AudioEntry) -> Self {
         (SharedString::from(entry.added_at), entry.id)
+    }
+}
+
+impl From<Source> for (SharedString, SharedString) {
+    fn from(entry: Source) -> Self {
+        (SharedString::from(entry.origin), SharedString::from(entry.path))
     }
 }
 
