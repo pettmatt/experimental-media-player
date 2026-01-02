@@ -24,14 +24,12 @@ export component MainList {
 
 					HorizontalBox {
 						alignment: start;
+						spacing: 25px;
 
 						Text { text: media.title; }
+						Text { text: media.artist; }
 
-						Text {
-							text: media.artist;
-						}
-
-						Text { text: media.playing ? "[1]" : "[0]"; }
+						Text { text: media.playing ? "Playing" : ""; }
 						// Button {
 						// 	text: "Play";
 						// 	clicked => {

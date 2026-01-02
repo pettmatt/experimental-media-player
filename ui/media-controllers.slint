@@ -18,12 +18,14 @@ export component MediaControllers {
 
 	VerticalBox {
 		HorizontalBox {
+			alignment: center;
+			spacing: 5px;
+
 			Button { text: @tr("mix"); clicked => { MediaActions.media_mix() } }
 			Button { text: @tr("prev"); clicked => { MediaActions.media_change(-1) } }
 			Button { text: @tr("start"); clicked => { MediaActions.media_toggle() } }
 			Button { text: @tr("next"); clicked => { MediaActions.media_change(1) } }
 			Button { text: @tr("loop"); clicked => { MediaActions.media_loop() } }
-			Button { text: @tr("volume"); clicked => { MediaActions.media_loop() } }
 			Rectangle {
 				bg := Rectangle {
 					width: 25px;
@@ -39,7 +41,11 @@ export component MediaControllers {
 					vs := VolumeSlider {
 						settings: SlintState.settings;
 						width: parent.width;
-						y: -parent.height / 2- 5px;
+						y: -parent.height / 2 - 5px;
+						released(_) => {
+							bg.background = Colors.beige;
+							vs.visible = false;
+						}
 					}
 				}
 

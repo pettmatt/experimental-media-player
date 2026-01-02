@@ -10,17 +10,14 @@ import { DisplayBox } from "components/display-box.slint";
 export { SlintState, SettingActions, MediaActions, ContextMenuActions }
 
 export component AppWindow inherits Window {
-	// preferred-width: 100%;
-    // preferred-height: 100%;
-
 	property<physical-length> gl-margin: 5px;
 	property<physical-length> gl-padding: 5px;
 
     main-view := HorizontalBox {
 		x: 0px;
-		y: 0px;
+		y: 25px;
 		width: 100%;
-		height: root.height - (root.width < 700px ? 200px : 150px);
+		height: root.height - (root.width < 700px ? 223px : 173px);
 
 		if root.width > 500px: DisplayBox {
 			SideBar { y: 0; list: SlintState.playlist; }
@@ -48,7 +45,8 @@ export component AppWindow inherits Window {
 			clicked => { SettingActions.new_local_source() }
 		}
 
-		SideBar { visible: root.width < 500px; }
+		if root.width < 500px:
+			SideBar {}
 
 		if root.width < 700px: MobileQueue {
 			queue: SlintState.queue;
