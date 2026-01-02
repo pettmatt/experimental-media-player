@@ -4,6 +4,8 @@ use derive_more::derive::{Display, Error};
 use gstreamer::{element_error, element_warning, prelude::*, State};
 use gstreamer::{Element, ElementFactory};
 use std::sync::{Arc, Mutex};
+use std::env;
+
 
 // Source: https://gitlab.freedesktop.org/gstreamer/gstreamer-rs/-/blob/main/examples/src/bin/decodebin.rs?ref_type=heads
 
@@ -21,187 +23,191 @@ struct ErrorValue(Arc<Mutex<Option<Error>>>);
 
 #[derive(Clone)]
 pub struct MediaPlayer {
-    pipeline: gstreamer::Pipeline, // DO NOT USE pipeline.clone() TO USE THE PIPELINE WITHIN A CALLBACK
+    pipeline: std::sync::Arc<gstreamer::Pipeline>, // DO NOT USE pipeline.clone() TO USE THE PIPELINE WITHIN A CALLBACK
     source: Option<Element>,
     decode_bin: Element,
     volume: Element,
+    thread: Option<std::thread::Thread>
 }
 
 impl MediaPlayer {
     pub fn new() -> Self {
         gstreamer::init().unwrap();
         Self {
-            pipeline: gstreamer::Pipeline::default(),
+            pipeline: std::sync::Arc::new(gstreamer::Pipeline::default()),
             source: None,
             decode_bin: ElementFactory::make("decodebin").build().unwrap(),
             volume: ElementFactory::make("volume").build().unwrap(),
+            thread: None,
         }
     }
 
     pub fn change_source(&mut self, source_path: String) -> Result<(), Box<dyn std::error::Error>> {
-        self.source = Some(
-            ElementFactory::make("filesrc")
-                .property("location", source_path)
-                .build()?,
-        );
+    	if let Some(source) = &self.source {
+     		source.set_property("location", &source_path);
+     	} else {
+	        self.source = Some(
+	            ElementFactory::make("filesrc")
+	                .property("location", source_path)
+	                .build()?,
+	        );
+      	}
         Ok(())
     }
 
-    fn initialize_pipeline(&self) {
-        self.pipeline
-            .add_many(&[self.source.as_ref().unwrap(), &self.decode_bin])
-            .unwrap();
-    }
+    // fn initialize_pipeline(&self) {
+    //     self.pipeline
+    //         .add_many(&[self.source.as_ref().unwrap(), &self.decode_bin])
+    //         .unwrap();
+    // }
 
-    fn initialize_element_links(&self) {
-        Element::link_many([&self.source.as_ref().unwrap(), &self.decode_bin]).unwrap();
-    }
+    // fn initialize_element_links(&self) {
+    //     Element::link_many([&self.source.as_ref().unwrap(), &self.decode_bin]).unwrap();
+    // }
 
-    fn clean_up(&self) -> Result<(), Box<dyn std::error::Error>> {
-        self.pipeline.set_state(State::Null)?;
-        Ok(())
-    }
+    // fn clean_up(&self) -> Result<(), Box<dyn std::error::Error>> {
+    //     self.pipeline.set_state(State::Null)?;
+    //     Ok(())
+    // }
 
-    fn watch(&self, bus: gstreamer::Bus) {
-        for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
-            use gstreamer::MessageView;
+    // fn watch(&self, bus: gstreamer::Bus) {
 
-            match msg.view() {
-                MessageView::Eos(..) => break,
-                // MessageView::Error(err) => {
-                //     self.pipeline.set_state(State::Null).unwrap();
+    // }
 
-                //     match err.details() {
-                //         Some(details) if details.name() == "error-details" => details
-                //             .get::<&ErrorValue>("error")
-                //             .unwrap()
-                //             .clone()
-                //             .0
-                //             .lock()
-                //             .unwrap()
-                //             .take()
-                //             .map(anyhow::Result::Err)
-                //             .expect("error-details message without actual error"),
-                //         _ => Err(ErrorMessage {
-                //             src: msg
-                //                 .src()
-                //                 .map(|s| s.path_string())
-                //                 .unwrap_or_else(|| glib::GString::from("UNKNOWN")),
-                //             error: err.error(),
-                //             debug: err.debug(),
-                //         }
-                //         .into()),
-                //     }
-                //     .unwrap();
-                // }
-                MessageView::StateChanged(s) => {
-                    println!(
-                        "State changed from {:?}: {:?} -> {:?} ({:?})",
-                        s.src().map(|s| s.path_string()),
-                        s.old(),
-                        s.current(),
-                        s.pending()
-                    );
-                }
-                _ => (),
-            }
-        }
+    pub fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    	gstreamer::init()?;
 
-        self.pipeline.set_state(State::Null).unwrap();
+	    let args: Vec<_> = env::args().collect();
+	    let uri: &str = if args.len() == 2 {
+			args[1].as_ref()
+	    } else {
+	        println!("Usage: decodebin file_path");
+	        std::process::exit(-1)
+	     };
 
-        // Watch for an error or EOS
-        // let bus = self.pipeline.bus().unwrap();
-        // for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
-        //     match msg.view() {
-        //         gstreamer::MessageView::Error(err) => {
-        //             eprintln!("Error: {:?}", err);
-        //             break;
-        //         }
-        //         gstreamer::MessageView::Eos(..) => {
-        //             println!("End of stream");
-        //             break;
-        //         }
-        //         _ => (),
-        //     }
-        // }
-    }
+	    // let pipeline = gstreamer::Pipeline::default();
+	    // let src = gstreamer::ElementFactory::make("filesrc")
+	    //     .property("location", uri)
+	    //     .build()?;
+	    // let decodebin = gstreamer::ElementFactory::make("decodebin").build()?;
 
-    pub fn initialize(&self) -> Result<(), Box<dyn std::error::Error>> {
-        self.initialize_pipeline();
-        self.initialize_element_links();
+		self.change_source(uri.to_string());
 
-        let pipeline_weak = self.pipeline.downgrade();
-        self.decode_bin
-            .connect_pad_added(move |decode_bin, source_pad| {
-                let Some(pipeline) = pipeline_weak.upgrade() else {
-                    return;
-                };
+	    self.pipeline.add_many(&[self.source.as_ref().unwrap(), &self.decode_bin])?;
+	    gstreamer::Element::link_many([self.source.as_ref().unwrap(), &self.decode_bin])?;
 
-                let (is_audio, is_video) = {
-                    let media_type = source_pad.current_caps().and_then(|caps| {
-                        caps.structure(0).map(|string| {
-                            let name = string.name();
-                            (name.starts_with("audio/"), name.starts_with("video/"))
-                        })
-                    });
+	    let pipeline_weak = self.pipeline.downgrade();
+	    self.decode_bin.connect_pad_added(move |dbin, src_pad| {
+	        let Some(pipeline) = pipeline_weak.upgrade() else {
+	            return;
+	        };
 
-                    match media_type {
-                        Some(media_type) => media_type,
-                        None => {
-                            element_warning!(
-                                decode_bin,
-                                gstreamer::CoreError::Negotiation,
-                                ("Failed to get media type from pad {}", source_pad.name())
-                            );
-                            return;
-                        }
-                    }
-                };
+	        let (is_audio, is_video) = {
+	            let media_type = src_pad.current_caps().and_then(|caps| {
+	                caps.structure(0).map(|s| {
+	                    let name = s.name();
+	                    (name.starts_with("audio/"), name.starts_with("video/"))
+	                })
+	            });
 
-                let insert_sink = |is_audio, is_video| -> Result<(), Error> {
-                    if is_audio {
-                        let queue = ElementFactory::make("queue").build().unwrap();
-                        let convert = ElementFactory::make("audioconvert").build().unwrap();
-                        let resample = ElementFactory::make("audioresample").build().unwrap();
-                        let sink = ElementFactory::make("autoaudiosink").build().unwrap(); // pwaudiosink | autoaudiosink
+	            match media_type {
+	                None => {
+	                    element_warning!(
+	                        dbin,
+	                        gstreamer::CoreError::Negotiation,
+	                        ("Failed to get media type from pad {}", src_pad.name())
+	                    );
 
-                        let elements = &[&queue, &convert, &resample, &sink];
-                        pipeline.add_many(elements).unwrap();
-                        Element::link_many(elements).unwrap();
-                    } else if is_video {
-                        let queue = ElementFactory::make("queue").build().unwrap();
-                        let convert = ElementFactory::make("videoconvert").build().unwrap();
-                        let scale = ElementFactory::make("videoscale").build().unwrap();
-                        let sink = ElementFactory::make("autovideosink").build().unwrap();
+	                    return;
+	                }
+	                Some(media_type) => media_type,
+	            }
+	        };
 
-                        let elements = &[&queue, &convert, &scale, &sink];
-                        pipeline.add_many(elements).unwrap();
-                        Element::link_many(elements).unwrap();
+	        let insert_sink = |is_audio, is_video| -> Result<(), Error> {
+	            if is_audio {
+	                let queue = gstreamer::ElementFactory::make("queue").build()?;
+	                let convert = gstreamer::ElementFactory::make("audioconvert").build()?;
+	                let resample = gstreamer::ElementFactory::make("audioresample").build()?;
+	                let sink = gstreamer::ElementFactory::make("autoaudiosink").build()?;
 
-                        for element in elements {
-                            element.sync_state_with_parent().unwrap()
-                        }
+	                let elements = &[&queue, &convert, &resample, &sink];
+	                pipeline.add_many(elements)?;
+	                gstreamer::Element::link_many(elements)?;
 
-                        let sink_pad = queue.static_pad("sink").expect("queue has no sinkpad");
-                        source_pad.link(&sink_pad).unwrap();
-                    }
+	                for e in elements {
+	                    e.sync_state_with_parent()?;
+	                }
 
-                    Ok(())
-                };
+	                let sink_pad = queue.static_pad("sink").expect("queue has no sinkpad");
+	                src_pad.link(&sink_pad)?;
+	            } else if is_video {
+	                let queue = gstreamer::ElementFactory::make("queue").build()?;
+	                let convert = gstreamer::ElementFactory::make("videoconvert").build()?;
+	                let scale = gstreamer::ElementFactory::make("videoscale").build()?;
+	                let sink = gstreamer::ElementFactory::make("autovideosink").build()?;
 
-                if let Err(err) = insert_sink(is_audio, is_video) {
-                    element_error!(
-                        decode_bin,
-                        gstreamer::LibraryError::Failed,
-                        ("Failed to insert sink"),
-                        details: gstreamer::Structure::builder("error-details")
-                            .field("error", ErrorValue(Arc::new(Mutex::new(Some(err)))))
-                            .build()
-                    );
-                }
-            });
+	                let elements = &[&queue, &convert, &scale, &sink];
+	                pipeline.add_many(elements)?;
+	                gstreamer::Element::link_many(elements)?;
 
-        Ok(())
+	                for e in elements {
+	                    e.sync_state_with_parent()?
+	                }
+
+	                let sink_pad = queue.static_pad("sink").expect("queue has no sinkpad");
+	                src_pad.link(&sink_pad)?;
+	            }
+
+	            Ok(())
+	        };
+
+	        if let Err(err) = insert_sink(is_audio, is_video) {
+	            element_error!(
+	                dbin,
+	                gstreamer::LibraryError::Failed,
+	                ("Failed to insert sink"),
+	                details: gstreamer::Structure::builder("error-details")
+                        .field("error", ErrorValue(Arc::new(Mutex::new(Some(err)))))
+                        .build()
+	            );
+	        }
+	    });
+
+		let pipeline = std::sync::Arc::clone(&self.pipeline);
+		std::thread::spawn(move || {
+			pipeline.set_state(gstreamer::State::Playing).unwrap();
+
+			let bus = pipeline
+			    .bus()
+			    .expect("Pipeline without bus. Shouldn't happen!");
+
+			for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
+			    use gstreamer::MessageView;
+
+			    match msg.view() {
+			        MessageView::Eos(..) => break,
+			        MessageView::Error(err) => {
+			            pipeline.set_state(gstreamer::State::Null).unwrap();
+			            eprintln!("(MediaPlayer bus error): {:?}", err);
+			           	break;
+			        }
+			        MessageView::StateChanged(s) => {
+			            println!(
+			                "(MediaPlayer) state changed from {:?}: {:?} -> {:?} ({:?})",
+			                s.src().map(|s| s.path_string()),
+			                s.old(),
+			                s.current(),
+			                s.pending()
+			            );
+			        }
+			        _ => (),
+			    }
+			}
+			pipeline.set_state(gstreamer::State::Null).unwrap();
+		});
+
+	    Ok(())
     }
 
     pub fn start(&mut self, audio: &Track) {
@@ -209,24 +215,17 @@ impl MediaPlayer {
             self.change_source(audio.path.clone()).unwrap();
         }
 
+        self.set_volume(0.5f64);
+
         if let Ok(()) = self.initialize() {
             println!("(MediaPlayer) Initialization DONE")
         }
 
-        self.set_volume(0.5f64);
-        self.pipeline.set_state(State::Playing).unwrap();
-        let bus = self
-            .pipeline
-            .bus()
-            .expect("Oops... pipeline should always have access to bus!");
-        self.watch(bus);
-
-        // if self.source.is_none() {
-        //     self.change_source(audio.path.clone()).unwrap();
-        // }
-        // self.pipeline.set_state(gstreamer::State::Playing).unwrap();
-        // self.watch(); // BUG that crashes the whole application without playing audio. Check pipeline.
-        // self.clean_up().unwrap();
+        // self.pipeline.set_state(State::Playing).unwrap();
+        // let bus = self
+        //     .pipeline
+        //     .bus()
+        //     .expect("Oops... pipeline should always have access to bus!");
     }
 
     pub fn start_next(&mut self, audio: &Track) {}
@@ -262,7 +261,7 @@ impl MediaPlayer {
     }
 
     pub fn set_volume(&self, value: f64) {
-        self.volume.set_property("volume", value);
+       	self.volume.set_property("volume", value);
     }
 
     pub async fn callback_after_audio_ends(&self, callback: fn()) {}
