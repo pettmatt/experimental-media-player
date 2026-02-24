@@ -1,8 +1,8 @@
 use crate::{logic::data_types::track::Track, State as AppState};
 use anyhow::Error;
 use derive_more::derive::{Display, Error};
-use gstreamer::{element_error, element_warning, prelude::*, State};
-use gstreamer::{Element, ElementFactory};
+// use gstreamer::{element_error, element_warning, prelude::*, State};
+// use gstreamer::{Element, ElementFactory};
 use std::sync::{Arc, Mutex};
 use std::env;
 
@@ -23,21 +23,21 @@ struct ErrorValue(Arc<Mutex<Option<Error>>>);
 
 #[derive(Clone)]
 pub struct MediaPlayer {
-    pipeline: std::sync::Arc<gstreamer::Pipeline>, // DO NOT USE pipeline.clone() TO USE THE PIPELINE WITHIN A CALLBACK
-    source: Option<Element>,
-    decode_bin: Element,
-    volume: Element,
+    // pipeline: std::sync::Arc<gstreamer::Pipeline>, // DO NOT USE pipeline.clone() TO USE THE PIPELINE WITHIN A CALLBACK
+    // source: Option<Element>,
+    // decode_bin: Element,
+    // volume: Element,
     thread: Option<std::thread::Thread>
 }
 
 impl MediaPlayer {
     pub fn new() -> Self {
-        gstreamer::init().unwrap();
+        // gstreamer::init().unwrap();
         Self {
-            pipeline: std::sync::Arc::new(gstreamer::Pipeline::default()),
-            source: None,
-            decode_bin: ElementFactory::make("decodebin").build().unwrap(),
-            volume: ElementFactory::make("volume").build().unwrap(),
+            // pipeline: std::sync::Arc::new(gstreamer::Pipeline::default()),
+            // source: None,
+            // decode_bin: ElementFactory::make("decodebin").build().unwrap(),
+            // volume: ElementFactory::make("volume").build().unwrap(),
             thread: None,
         }
     }
@@ -46,11 +46,11 @@ impl MediaPlayer {
     	if let Some(source) = &self.source {
      		source.set_property("location", &source_path);
      	} else {
-	        self.source = Some(
-	            ElementFactory::make("filesrc")
-	                .property("location", source_path)
-	                .build()?,
-	        );
+	        // self.source = Some(
+	            // ElementFactory::make("filesrc")
+	            //     .property("location", source_path)
+	            //     .build()?,
+	        // );
       	}
         Ok(())
     }
@@ -75,7 +75,7 @@ impl MediaPlayer {
     // }
 
     pub fn initialize(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-    	gstreamer::init()?;
+    	// gstreamer::init()?;
 
 	    let args: Vec<_> = env::args().collect();
 	    let uri: &str = if args.len() == 2 {
@@ -94,7 +94,7 @@ impl MediaPlayer {
 		self.change_source(uri.to_string());
 
 	    self.pipeline.add_many(&[self.source.as_ref().unwrap(), &self.decode_bin])?;
-	    gstreamer::Element::link_many([self.source.as_ref().unwrap(), &self.decode_bin])?;
+	    // gstreamer::Element::link_many([self.source.as_ref().unwrap(), &self.decode_bin])?;
 
 	    let pipeline_weak = self.pipeline.downgrade();
 	    self.decode_bin.connect_pad_added(move |dbin, src_pad| {
@@ -112,11 +112,11 @@ impl MediaPlayer {
 
 	            match media_type {
 	                None => {
-	                    element_warning!(
-	                        dbin,
-	                        gstreamer::CoreError::Negotiation,
-	                        ("Failed to get media type from pad {}", src_pad.name())
-	                    );
+	                    // element_warning!(
+	                    //     dbin,
+	                    //     gstreamer::CoreError::Negotiation,
+	                    //     ("Failed to get media type from pad {}", src_pad.name())
+	                    // );
 
 	                    return;
 	                }
@@ -125,86 +125,86 @@ impl MediaPlayer {
 	        };
 
 	        let insert_sink = |is_audio, is_video| -> Result<(), Error> {
-	            if is_audio {
-	                let queue = gstreamer::ElementFactory::make("queue").build()?;
-	                let convert = gstreamer::ElementFactory::make("audioconvert").build()?;
-	                let resample = gstreamer::ElementFactory::make("audioresample").build()?;
-	                let sink = gstreamer::ElementFactory::make("autoaudiosink").build()?;
+	            // if is_audio {
+	                // let queue = gstreamer::ElementFactory::make("queue").build()?;
+	                // let convert = gstreamer::ElementFactory::make("audioconvert").build()?;
+	                // let resample = gstreamer::ElementFactory::make("audioresample").build()?;
+	                // let sink = gstreamer::ElementFactory::make("autoaudiosink").build()?;
 
-	                let elements = &[&queue, &convert, &resample, &sink];
-	                pipeline.add_many(elements)?;
-	                gstreamer::Element::link_many(elements)?;
+	                // let elements = &[&queue, &convert, &resample, &sink];
+	                // pipeline.add_many(elements)?;
+	                // gstreamer::Element::link_many(elements)?;
 
-	                for e in elements {
-	                    e.sync_state_with_parent()?;
-	                }
+	            //     for e in elements {
+	            //         e.sync_state_with_parent()?;
+	            //     }
 
-	                let sink_pad = queue.static_pad("sink").expect("queue has no sinkpad");
-	                src_pad.link(&sink_pad)?;
-	            } else if is_video {
-	                let queue = gstreamer::ElementFactory::make("queue").build()?;
-	                let convert = gstreamer::ElementFactory::make("videoconvert").build()?;
-	                let scale = gstreamer::ElementFactory::make("videoscale").build()?;
-	                let sink = gstreamer::ElementFactory::make("autovideosink").build()?;
+	            //     let sink_pad = queue.static_pad("sink").expect("queue has no sinkpad");
+	            //     src_pad.link(&sink_pad)?;
+	            // } else if is_video {
+	            //     let queue = gstreamer::ElementFactory::make("queue").build()?;
+	            //     let convert = gstreamer::ElementFactory::make("videoconvert").build()?;
+	            //     let scale = gstreamer::ElementFactory::make("videoscale").build()?;
+	            //     let sink = gstreamer::ElementFactory::make("autovideosink").build()?;
 
-	                let elements = &[&queue, &convert, &scale, &sink];
-	                pipeline.add_many(elements)?;
-	                gstreamer::Element::link_many(elements)?;
+	            //     let elements = &[&queue, &convert, &scale, &sink];
+	            //     pipeline.add_many(elements)?;
+	            //     gstreamer::Element::link_many(elements)?;
 
-	                for e in elements {
-	                    e.sync_state_with_parent()?
-	                }
+	            //     for e in elements {
+	            //         e.sync_state_with_parent()?
+	            //     }
 
-	                let sink_pad = queue.static_pad("sink").expect("queue has no sinkpad");
-	                src_pad.link(&sink_pad)?;
-	            }
+	            //     let sink_pad = queue.static_pad("sink").expect("queue has no sinkpad");
+	            //     src_pad.link(&sink_pad)?;
+	            // }
 
 	            Ok(())
 	        };
 
 	        if let Err(err) = insert_sink(is_audio, is_video) {
-	            element_error!(
-	                dbin,
-	                gstreamer::LibraryError::Failed,
-	                ("Failed to insert sink"),
-	                details: gstreamer::Structure::builder("error-details")
-                        .field("error", ErrorValue(Arc::new(Mutex::new(Some(err)))))
-                        .build()
-	            );
+	            // element_error!(
+	            //     dbin,
+	            //     gstreamer::LibraryError::Failed,
+	            //     ("Failed to insert sink"),
+	            //     details: gstreamer::Structure::builder("error-details")
+             //            .field("error", ErrorValue(Arc::new(Mutex::new(Some(err)))))
+             //            .build()
+	            // );
 	        }
 	    });
 
 		let pipeline = std::sync::Arc::clone(&self.pipeline);
 		std::thread::spawn(move || {
-			pipeline.set_state(gstreamer::State::Playing).unwrap();
+			// pipeline.set_state(gstreamer::State::Playing).unwrap();
 
 			let bus = pipeline
 			    .bus()
 			    .expect("Pipeline without bus. Shouldn't happen!");
 
-			for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
-			    use gstreamer::MessageView;
+			// for msg in bus.iter_timed(gstreamer::ClockTime::NONE) {
+			//     use gstreamer::MessageView;
 
-			    match msg.view() {
-			        MessageView::Eos(..) => break,
-			        MessageView::Error(err) => {
-			            pipeline.set_state(gstreamer::State::Null).unwrap();
-			            eprintln!("(MediaPlayer bus error): {:?}", err);
-			           	break;
-			        }
-			        MessageView::StateChanged(s) => {
-			            println!(
-			                "(MediaPlayer) state changed from {:?}: {:?} -> {:?} ({:?})",
-			                s.src().map(|s| s.path_string()),
-			                s.old(),
-			                s.current(),
-			                s.pending()
-			            );
-			        }
-			        _ => (),
-			    }
-			}
-			pipeline.set_state(gstreamer::State::Null).unwrap();
+			//     match msg.view() {
+			//         MessageView::Eos(..) => break,
+			//         MessageView::Error(err) => {
+			//             pipeline.set_state(gstreamer::State::Null).unwrap();
+			//             eprintln!("(MediaPlayer bus error): {:?}", err);
+			//            	break;
+			//         }
+			//         MessageView::StateChanged(s) => {
+			//             println!(
+			//                 "(MediaPlayer) state changed from {:?}: {:?} -> {:?} ({:?})",
+			//                 s.src().map(|s| s.path_string()),
+			//                 s.old(),
+			//                 s.current(),
+			//                 s.pending()
+			//             );
+			//         }
+			//         _ => (),
+			//     }
+			// }
+			// pipeline.set_state(gstreamer::State::Null).unwrap();
 		});
 
 	    Ok(())

@@ -4,8 +4,8 @@ use crate::logic::data_types::track::Track;
 use crate::logic::database;
 use crate::logic::queue::Queue;
 use crate::logic::validate_sources;
-use crate::{AppWindow, ContextMenuActions, MediaActions, SettingActions, SlintPlaylist, SlintState, State};
-use slint::{ComponentHandle, ModelRc};
+use crate::{AppWindow, ContextMenuActions, MediaActions, SettingActions, SlintState, State};
+use slint::{ComponentHandle};
 use std::{cell::RefCell, rc::Rc};
 
 pub fn handle_initialization(state: &mut State) {

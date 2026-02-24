@@ -11,10 +11,10 @@ use dasp_sample::FromSample;
 #[cfg(not(feature = "crossbeam-channel"))]
 use std::sync::mpsc::{Receiver, Sender};
 
-use rodio::mixer::Mixer;
+// use rodio::mixer::Mixer;
 // use dasp_sample::FromSample;
-use rodio::source::{Done, SeekError};
-use rodio::{queue, Source};
+// use rodio::source::{Done, SeekError};
+// use rodio::{queue, Source};
 
 pub struct Sink {
     queue_prv_tx: Arc<queue::SourcesQueueInput>, // Played songs
