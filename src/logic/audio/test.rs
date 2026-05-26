@@ -28,53 +28,72 @@ const CHUNK_SIZE: usize = 1024;
 
 #[derive(Clone)]
 pub struct Player {
-	stream: MediaSourceStream,
-	source: String,
-	extension: Hint,
+	hint: Result<Hint>,
+	stream: Result<MediaSourceStream>,
+	source: Result<std::fs::File>,
 	decoder: Result<Box<dyn Decoder>>,
-	track: audio::Audio,
 }
 
 impl Player {
-    pub fn new(
-    	source: String
-        // decoder: symphonia::core::codecs::Decoder,
-        // config: cpal::StreamConfig,
-        // track: symphonia::core::formats::Track,
-    ) -> Self {
-     	// Check if local or not
-      	let source = std::fs::File::open(source).expect("failed to open media");
-    	let stream = MediaSourceStream::new(Box::new(source), Default::default());
-
-     	let mut hint = Hint::new();
-      	hint.with_extension("ogg");
-       	let meta_opts: MetadataOptions = Default::default();
-        let fmt_opts: FormatOptions = Default::default();
-
-        let mut format = symphonia::default::get_probe()
-            .probe(&hint)
-           	.expect("Player :: unsupported format");
-        let track = format.default_track(TrackType::Audio).expect("Player :: no audio track");
-        let mut dec_opts: AudioDecoderOptions = Default::default();
-
-        let mut decoder = symphonia::default::get_codecs()
-            .make(
-          		track.codec_params.as_ref().expect("Player :: codec parameters missing")
-            		.audio()
-              		.unwrap(),
-            	&dec_opts,
-           	);
-
+    pub fn new() -> Self {
         Self {
-        	stream: stream,
-         	source: source,
-          	extension: hint,
-            decoder: decoder,
-           	track: track,
+        	stream: None,
+         	source: None,
+          	hint: None,
+            decoder: None,
         }
     }
 
-    pub fn play<T>(&mut self) {
+    pub fn initialize(&mut self, source_path: String) {
+     	// TODO: Check if local or not + add better error handler.
+      	let (source, _, _, _) = self.set_new_source(source_path);
+    	let stream = MediaSourceStream::new(Box::new(source), Default::default());
+    	if let Err(err) = !self.set_decoder(self.source) {
+   			println!("Player :: Initialization error: {}", err)
+     	}
+    }
+
+    fn set_new_source(&mut self, source_path: String) -> Result<(std::fs::File, Hint, MetadataOptions, FormatOptions)> {
+    	let source = std::fs::File::open(source_path);
+     	if let Err(err) = &source {
+    		println!("Player :: Error: failed to open media");
+      		return err;
+      	}
+
+    	let mut hint = Hint::new();
+     	hint.with_extension("ogg"); // TODO: Probe from custom source file struct
+      	let meta_opts: MetadataOptions = Default::default();
+       	let fmt_opts: FormatOptions = Default::default();
+
+        self.source = source;
+        Ok((source, hint, meta_opts, fmt_opts))
+    }
+
+    fn set_decoder(&mut self, source: Result<std::fs::File>) -> Result<()> {
+	    let mut format = symphonia::default::get_probe()
+	        .probe(&self.hint)
+	       	.expect("Player :: unsupported format");
+	    let track = format.default_track(TrackType::Audio);
+		if let Err(err) = &track {
+			println!("Player :: Error: {}", err);
+			return err;
+		}
+
+	    let mut dec_opts: AudioDecoderOptions = Default::default();
+	    let mut decoder = symphonia::default::get_codecs().make(
+	  		track.codec_params.as_ref().expect("Player :: codec parameters missing").audio().unwrap(),
+	       	&dec_opts,
+	   	).expect("Player :: decoder: unsupported codec.");
+
+		self.decoder = decoder;
+		Ok(())
+    }
+
+    pub fn play(&mut self, new_source: Option<String>) {
+    	if new_source != self.source {
+     		self.set_new_source(new_source);
+     	}
+
     	thread::spawn(|| {
 	    	loop {
 	     		let packet = match self.format.next_packet() {
@@ -96,10 +115,10 @@ impl Player {
 					}
 	       		};
 
-	       		while !self.format.metadata().is_latest() {
-	         		// Consumes latest metadata and pop the old head
-	         		self.format.metadata().pop();
-	         	}
+         		// Consumes latest metadata and pop the old head
+	       		// while !self.format.metadata().is_latest() {
+	         	// 	self.format.metadata().pop();
+				// }
 
 	       		if packet.track_id != self.source.id {
 	         		continue;
