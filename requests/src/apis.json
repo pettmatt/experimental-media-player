@@ -1,6 +1,7 @@
 [
 	{
 		"url": "https://accounts.spotify.com/api",
+		"prefix": "SPOTIFY",
 		"paths": {
 			"artist": {
 				"path": "/v1/artists/",
@@ -14,24 +15,24 @@
 				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
 				"body": {
 					"grant_type": "client_credentials",
-					"client_id": "ENV",
-					"client_secret": "ENV"
+					"client_id": "ENV.CLIENT_ID",
+					"client_secret": "ENV.CLIENT_SECRET"
 				}
 			},
 			"authenticate": {
 				"path": "/authorize?",
 				"path-parameters": {
 					"response_type": "code",
-					"client_id": "CLIENT_ID",
+					"client_id": "ENV.CLIENT_ID",
 					"scope": "user-read-private,user-read-email",
-					"redirect_uri": "REDIRECT_URI",
+					"redirect_uri": "ENV.REDIRECT_URI",
 					"code_challenge_method": "S256",
-					"code_challenge": "GENERATED"
+					"code_challenge": "OPERATION.GENERATED"
 				},
 				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
 				"body": {
 					"grant_type": "client_credentials",
-					"client_id": "ENV"
+					"client_id": "ENV.CLIENT_ID"
 				}
 			}
 		}

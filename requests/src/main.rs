@@ -1,3 +1,5 @@
+mod stream;
+
 use base64::{Engine as _, engine::general_purpose};
 use serde::Deserialize;
 use serde_json::Value;
@@ -5,6 +7,7 @@ use sha2::{Digest, Sha256};
 use std::env;
 use std::{collections::HashMap, path::Path};
 use tokio;
+use stream::stream::stream_from_source;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -15,6 +18,12 @@ struct AuthResponse {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+	stream_from_source();
+	Ok(())
+}
+
+// #[tokio::main]
+async fn main_se() -> Result<()> {
     dotenv::from_filename(".env-requests").ok(); // Load env files
     let apis = fetch_apis("./src/apis.json").unwrap();
     println!("APIs {:?}", apis);
@@ -24,25 +33,32 @@ async fn main() -> Result<()> {
         let response = api.authenticate().await;
 
         if let Ok((result, state)) = response {
-            if let Ok(response) = result.error_for_status() {
-                let json: AuthResponse = response.json().await?;
-                let state_param = json
-                    .url
-                    .query_pairs()
-                    .find(|(key, _)| key == "sort")
-                    .map(|(_, value)| value.to_string());
+            match result.error_for_status() {
+            	Ok(response) =>  {
+	                let json: AuthResponse = response.json().await?;
+	                let state_param = json
+	                    .url
+	                    .query_pairs()
+	                    .find(|(key, _)| key == "sort")
+	                    .map(|(_, value)| value.to_string());
 
-                if let Some(state_value) = state_param {
-                    if state_value == state {
-                        println!("Response can be trusted!");
-                        println!("\nResult {:?}", json);
-                    } else {
-                        println!("Response CANNOT be trusted!");
-                    }
-                };
-            } else {
-                println!("Authentication failed. Status contained an error code.");
-            }
+	                if let Some(state_value) = state_param {
+	                    if state_value == state {
+	                        println!("Response can be trusted!");
+	                        println!("\nResult {:?}", json);
+	                    } else {
+	                        println!("Response CANNOT be trusted!");
+	                    }
+	                }
+             	},
+	            Err(error) => {
+	                println!("Authentication failed. Status contained an error code. {:?}", error);
+					println!("State: {:?}", state);
+	            },
+	            _ => {
+	            	println!("Authentication failed. Status contained an error code.");
+	            }
+	        }
         }
     }
 
@@ -62,6 +78,7 @@ fn fetch_apis(path_str: &str) -> Result<HashMap<String, Api>> {
             ..Default::default()
         };
 
+        let prefix = String::from(object["prefix"].as_str().unwrap_or("NONE"));
         for (name, p) in object["paths"].as_object().unwrap() {
             let mut path = ApiPath {
                 path: String::from(p["path"].as_str().unwrap()),
@@ -79,12 +96,14 @@ fn fetch_apis(path_str: &str) -> Result<HashMap<String, Api>> {
             }
 
             for (key, value) in p["body"].as_object().unwrap() {
-                let v = String::from(value.as_str().unwrap());
+                let mut v = String::from(value.as_str().unwrap());
+                v = fetch_env_value(v, &prefix);
                 path.body_parameters.insert(key.clone(), v);
             }
 
             for (key, value) in p["path-parameters"].as_object().unwrap() {
-                let v = String::from(value.as_str().unwrap());
+                let mut v = String::from(value.as_str().unwrap());
+                v = fetch_env_value(v, &prefix);
                 path.path_parameters.insert(key.clone(), v);
             }
 
@@ -97,6 +116,17 @@ fn fetch_apis(path_str: &str) -> Result<HashMap<String, Api>> {
     }
 
     Ok(list)
+}
+
+fn fetch_env_value(string: String, prefix: &String) -> String {
+ 	if string.contains(&"ENV.") {
+  		let base = &string[4..string.len().try_into().unwrap()];
+  		let key = format!("{}_{}", &prefix, &base);
+   		let env_value = env::var(key).unwrap_or_else(|_| "NONE".to_string());
+     	return env_value;
+    }
+
+    string
 }
 
 #[derive(Debug, Clone, Default)]
@@ -120,10 +150,11 @@ impl<'a> std::fmt::Display for ApiPath {
 
 impl ApiPath {
     fn stringify_path_parametrs(&self) -> String {
-        self.path_parameters
+        let result: String = self.path_parameters
             .iter()
             .map(|(k, v)| format!("{}={}{}", k, v, "&"))
-            .collect()
+            .collect();
+        result.trim_end_matches("&").to_string()
     }
 }
 
@@ -199,19 +230,19 @@ impl Api {
             .path_parameters
             .insert("code_challenge".to_string(), challenge);
 
-        let redirect = env::var("SPOTIFY_REDIRECT_URI").unwrap_or_else(|_| "NONE".to_string());
-        let client_id = env::var("SPOTIFY_CLIENT_ID").unwrap_or_else(|_| "NONE".to_string());
+        // let redirect = env::var("SPOTIFY_REDIRECT_URI").unwrap_or_else(|_| "NONE".to_string());
+        // let client_id = env::var("SPOTIFY_CLIENT_ID").unwrap_or_else(|_| "NONE".to_string());
 
-        auth_path
-            .path_parameters
-            .entry("redirect_uri".to_string())
-            .and_modify(|v| *v = redirect.clone())
-            .or_insert(redirect);
-        auth_path
-            .path_parameters
-            .entry("client_id".to_string())
-            .and_modify(|v| *v = client_id.clone())
-            .or_insert(client_id);
+        // auth_path
+        //     .path_parameters
+        //     .entry("redirect_uri".to_string())
+        //     .and_modify(|v| *v = redirect.clone())
+        //     .or_insert(redirect);
+        // auth_path
+        //     .path_parameters
+        //     .entry("client_id".to_string())
+        //     .and_modify(|v| *v = client_id.clone())
+        //     .or_insert(client_id);
 
         let response = self.get_request(&auth_path).await.unwrap();
         Ok((response, state))
