@@ -2,6 +2,7 @@
 	{
 		"url": "https://accounts.spotify.com/api",
 		"prefix": "SPOTIFY",
+		"enabled": false,
 		"paths": {
 			"artist": {
 				"path": "/v1/artists/",
@@ -35,6 +36,52 @@
 					"client_id": "ENV.CLIENT_ID"
 				}
 			}
+		}
+	},
+	{
+		"url": "https://www.youtube.com/watch?v=eVTXPUF4Oz4",
+		"prefix": "YOUTUBE",
+		"enabled": false,
+		"paths": {
+			"authenticate": {
+				"path": {
+					"main": "https://www.googleapis.com",
+					"sub": "/auth/youtube"
+				},
+				"path-parameters": {
+					"response_type": "code",
+					"client_id": "ENV.CLIENT_ID",
+					"scope": "user-read-private,user-read-email",
+					"redirect_uri": "ENV.REDIRECT_URI",
+					"code_challenge_method": "S256",
+					"code_challenge": "OPERATION.GENERATED"
+				},
+				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
+				"body": {
+					"grant_type": "client_credentials",
+					"client_id": "ENV.CLIENT_ID"
+				}
+			}
+		},
+		"user_playlists": {
+			"path": {
+				"main": "https://www.googleapis.com",
+				"sub": "/youtube/v3/playlists"
+			},
+			"path-parameters": {
+				"oauth2_token": "OPERATION.AUTH"
+			},
+			"headers": { "Content-Type": "application/x-www-form-urlencoded" }
+		},
+		"search": {
+			"path": {
+				"main": "https://www.googleapis.com",
+				"sub": "/youtube/v3/search"
+			},
+			"path-parameters": {
+				"oauth2_token": "OPERATION.AUTH"
+			},
+			"headers": { "Content-Type": "application/x-www-form-urlencoded" }
 		}
 	}
 ]
