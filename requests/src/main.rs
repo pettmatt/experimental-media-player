@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::env;
 use std::{collections::HashMap, path::Path};
 use tokio;
-use stream::stream::stream_from_source;
+// use stream::stream::stream_from_source;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -18,8 +18,29 @@ struct AuthResponse {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-	stream_from_source();
-	Ok(())
+    println!("start");
+    dotenv::from_filename(".env-requests").ok();
+    let apis = fetch_apis("./src/apis.json").unwrap();
+    println!("APIs {:?}", apis);
+
+    if let Some(api) = apis.get("youtube") {
+        println!("\nExecuting for {:?}", api);
+        let api_path = ApiPath {
+            path: PathType::String(String::from("")),
+            headers: http::header::HeaderMap::new(),
+            body_parameters: HashMap::new(),
+            path_parameters: HashMap::new(),
+        };
+        let response = api.get_request(&api_path).await;
+        println!("Response: {:?}", response);
+    }
+
+    Ok(())
+}
+
+async fn main_s() -> Result<()> {
+    // stream_from_source();
+    Ok(())
 }
 
 // #[tokio::main]
@@ -34,35 +55,56 @@ async fn main_se() -> Result<()> {
 
         if let Ok((result, state)) = response {
             match result.error_for_status() {
-            	Ok(response) =>  {
-	                let json: AuthResponse = response.json().await?;
-	                let state_param = json
-	                    .url
-	                    .query_pairs()
-	                    .find(|(key, _)| key == "sort")
-	                    .map(|(_, value)| value.to_string());
+                Ok(response) => {
+                    let json: AuthResponse = response.json().await?;
+                    let state_param = json
+                        .url
+                        .query_pairs()
+                        .find(|(key, _)| key == "sort")
+                        .map(|(_, value)| value.to_string());
 
-	                if let Some(state_value) = state_param {
-	                    if state_value == state {
-	                        println!("Response can be trusted!");
-	                        println!("\nResult {:?}", json);
-	                    } else {
-	                        println!("Response CANNOT be trusted!");
-	                    }
-	                }
-             	},
-	            Err(error) => {
-	                println!("Authentication failed. Status contained an error code. {:?}", error);
-					println!("State: {:?}", state);
-	            },
-	            _ => {
-	            	println!("Authentication failed. Status contained an error code.");
-	            }
-	        }
+                    if let Some(state_value) = state_param {
+                        if state_value == state {
+                            println!("Response can be trusted!");
+                            println!("\nResult {:?}", json);
+                        } else {
+                            println!("Response CANNOT be trusted!");
+                        }
+                    }
+                }
+                Err(error) => {
+                    println!(
+                        "Authentication failed. Status contained an error code. {:?}",
+                        error
+                    );
+                    println!("State: {:?}", state);
+                }
+            }
         }
     }
 
     Ok(())
+}
+
+#[derive(Debug, Clone)]
+enum PathType {
+    String(String),
+    Object(Value),
+}
+
+impl PathType {
+    pub fn to_string(&self) -> String {
+        match self {
+            PathType::String(s) => s.clone(),
+            PathType::Object(o) => o.to_string(),
+        }
+    }
+}
+
+impl Default for PathType {
+    fn default() -> Self {
+        PathType::Object(Value::Object(serde_json::Map::new()))
+    }
 }
 
 fn fetch_apis(path_str: &str) -> Result<HashMap<String, Api>> {
@@ -80,8 +122,16 @@ fn fetch_apis(path_str: &str) -> Result<HashMap<String, Api>> {
 
         let prefix = String::from(object["prefix"].as_str().unwrap_or("NONE"));
         for (name, p) in object["paths"].as_object().unwrap() {
-            let mut path = ApiPath {
-                path: String::from(p["path"].as_str().unwrap()),
+            let path = if let Some(value) = p["path"].as_str() {
+                PathType::String(String::from(value))
+            } else if let Some(value) = p["path"].as_object() {
+                PathType::Object(Value::Object(value.clone()))
+            } else {
+                panic!("Path variable value is not string or an object.");
+            };
+
+            let mut api_path = ApiPath {
+                path: path,
                 headers: http::header::HeaderMap::new(),
                 body_parameters: HashMap::new(),
                 path_parameters: HashMap::new(),
@@ -89,7 +139,7 @@ fn fetch_apis(path_str: &str) -> Result<HashMap<String, Api>> {
 
             for (key, value) in p["headers"].as_object().unwrap() {
                 let v = String::from(value.as_str().unwrap());
-                path.headers.insert(
+                api_path.headers.insert(
                     http::header::HeaderName::try_from(key).unwrap(),
                     http::header::HeaderValue::try_from(v).unwrap(),
                 );
@@ -98,16 +148,17 @@ fn fetch_apis(path_str: &str) -> Result<HashMap<String, Api>> {
             for (key, value) in p["body"].as_object().unwrap() {
                 let mut v = String::from(value.as_str().unwrap());
                 v = fetch_env_value(v, &prefix);
-                path.body_parameters.insert(key.clone(), v);
+                api_path.body_parameters.insert(key.clone(), v);
             }
 
-            for (key, value) in p["path-parameters"].as_object().unwrap() {
+            for (key, value) in p["path_parameters"].as_object().unwrap() {
                 let mut v = String::from(value.as_str().unwrap());
                 v = fetch_env_value(v, &prefix);
-                path.path_parameters.insert(key.clone(), v);
+                v = fetch_operation_value(v);
+                api_path.path_parameters.insert(key.clone(), v);
             }
 
-            api.paths.insert(name.clone(), path);
+            api.paths.insert(name.clone(), api_path);
         }
 
         let s_url: Vec<&str> = api.url.split(".").collect();
@@ -119,11 +170,28 @@ fn fetch_apis(path_str: &str) -> Result<HashMap<String, Api>> {
 }
 
 fn fetch_env_value(string: String, prefix: &String) -> String {
- 	if string.contains(&"ENV.") {
-  		let base = &string[4..string.len().try_into().unwrap()];
-  		let key = format!("{}_{}", &prefix, &base);
-   		let env_value = env::var(key).unwrap_or_else(|_| "NONE".to_string());
-     	return env_value;
+    if string.contains(&"ENV.") {
+        let base = &string[4..string.len().try_into().unwrap()];
+        let key = format!("{}_{}", &prefix, &base);
+        let env_value = env::var(key).unwrap_or_else(|_| "NONE".to_string());
+        return env_value;
+    }
+
+    string
+}
+
+fn fetch_operation_value(string: String) -> String {
+    if string.contains(&"OPERATION.") {
+        if string.contains(&"AUTH") {
+            return String::from("AUTH");
+        } else if string.contains(&"GENERATED") {
+            return String::from("GENERATED");
+        } else {
+            panic!(
+                "Operation \"{}\" doesn't have corresponding function.",
+                string
+            );
+        }
     }
 
     string
@@ -131,18 +199,18 @@ fn fetch_env_value(string: String, prefix: &String) -> String {
 
 #[derive(Debug, Clone, Default)]
 struct ApiPath {
-    path: String,
+    path: PathType,
     // #[serde(deserialize_with = "deserialize_header_map")]
     headers: http::header::HeaderMap,
     body_parameters: HashMap<String, String>,
     path_parameters: HashMap<String, String>,
 }
 
-impl<'a> std::fmt::Display for ApiPath {
+impl std::fmt::Display for ApiPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Path {{ path: {}, headers: {:?}, body_parameters: {:?} }}",
+            "Path {{ path: {:?}, headers: {:?}, body_parameters: {:?} }}",
             self.path, self.headers, self.body_parameters
         )
     }
@@ -150,7 +218,8 @@ impl<'a> std::fmt::Display for ApiPath {
 
 impl ApiPath {
     fn stringify_path_parametrs(&self) -> String {
-        let result: String = self.path_parameters
+        let result: String = self
+            .path_parameters
             .iter()
             .map(|(k, v)| format!("{}={}{}", k, v, "&"))
             .collect();
@@ -230,19 +299,19 @@ impl Api {
             .path_parameters
             .insert("code_challenge".to_string(), challenge);
 
-        // let redirect = env::var("SPOTIFY_REDIRECT_URI").unwrap_or_else(|_| "NONE".to_string());
-        // let client_id = env::var("SPOTIFY_CLIENT_ID").unwrap_or_else(|_| "NONE".to_string());
+        let redirect = env::var("SPOTIFY_REDIRECT_URI").unwrap_or_else(|_| "NONE".to_string());
+        let client_id = env::var("SPOTIFY_CLIENT_ID").unwrap_or_else(|_| "NONE".to_string());
 
-        // auth_path
-        //     .path_parameters
-        //     .entry("redirect_uri".to_string())
-        //     .and_modify(|v| *v = redirect.clone())
-        //     .or_insert(redirect);
-        // auth_path
-        //     .path_parameters
-        //     .entry("client_id".to_string())
-        //     .and_modify(|v| *v = client_id.clone())
-        //     .or_insert(client_id);
+        auth_path
+            .path_parameters
+            .entry("redirect_uri".to_string())
+            .and_modify(|v| *v = redirect.clone())
+            .or_insert(redirect);
+        auth_path
+            .path_parameters
+            .entry("client_id".to_string())
+            .and_modify(|v| *v = client_id.clone())
+            .or_insert(client_id);
 
         let response = self.get_request(&auth_path).await.unwrap();
         Ok((response, state))
@@ -253,7 +322,7 @@ impl Api {
         let url = format!(
             "{}{}{}",
             &self.url,
-            subpath.path,
+            subpath.path.to_string(),
             subpath.stringify_path_parametrs()
         );
 
@@ -269,7 +338,7 @@ impl Api {
 
     async fn post_request(&self, subpath: &ApiPath) -> Result<reqwest::Response> {
         let client = reqwest::Client::new();
-        let url = format!("{}{}", &self.url, subpath.path);
+        let url = format!("{}{:?}", &self.url, subpath.path);
         let response = client
             .post(url)
             .form(&subpath.body_parameters)
@@ -299,5 +368,6 @@ where
             header_map.insert(header_name, header_value);
         }
     }
+
     Ok(header_map)
 }

@@ -1,47 +1,41 @@
 // Logic that is responsible for downloading or streaming from source.
 use reqwest::Client;
-use symphonia::core::audio::SampleBuffer;
+use symphonia::core::audio::sample::SampleBytes;
+use symphonia::core::codecs::registry::CodecRegistry;
+// use symphonia::core::audio::SampleBuffer;
 // use symphonia::core::codecs::DecoderOptions;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use futures::{FutureExt, StreamExt};
+use std::{error::Error, time::Duration};
 use symphonia::core::formats::FormatOptions;
+use symphonia::core::formats::probe::Probe;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
-use symphonia::core::probe::Hint;
 use symphonia_core::codecs::audio::AudioDecoderOptions as DecoderOptions;
-use cpal::traits::{HostTrait, DeviceTrait, StreamTrait};
-use futures::StreamExt;
-use std::{error::Error, time::Duration};
+use symphonia_core::formats::probe::Hint;
 use tokio::io::BufReader;
+use futures::Stream;
 
 #[tokio::main]
-pub async fn stream_from_source() -> Result<(), Box<dyn Error>> {
-	let url = "";
+pub async fn stream_from_source(url: String) -> Result<(), Box<dyn Error>> {
+    // let audio_url = get_yt_audio_url(&url).await?;
 
-	let client = Client::new();
-	let response = client.get(url).send().await?;
-	let stream = response.chunk(); // .bytes_stream();
+    let client = Client::new();
+    let response = client.get(&url).send().await?;
+    let bytes = response.bytes().await?;
 
-	let hint = Hint::new();
+    let cursor = std::io::Cursor::new(bytes.to_vec());
+    let mss = MediaSourceStream::new(Box::new(cursor), Default::default());
+
+    let hint = Hint::new();
+    let probe = Probe::new();
     let format_opts = FormatOptions::default();
     let metadata_opts = MetadataOptions::default();
+    let probed = probe.probe(&hint, mss, format_opts, metadata_opts)?;
 
-    // Set up CPAL for audio playback
-    let host = cpal::default_host();
-    let device = host.default_output_device().expect("No output device");
-    let config = device.default_output_config()?;
-
-    // Create a Symphonia decoder
-    let mut mss = MediaSourceStream::new(
-        Box::new(BufReader::new(stream.into_async_read())),
-        Default::default(),
-    );
-
-    // Previously named "probed"
-    let format = symphonia::default::get_probe()
-        .probe(&hint, mss, format_opts, metadata_opts)
-        .expect("Failed to probe format");
-
-    // let mut format = probed.format;
-    let track = format.default_track().expect("No default track");
+    let track = probed
+        .default_track(symphonia_core::formats::TrackType::Audio)
+        .expect("No default track");
     let decoder = symphonia::default::get_codecs()
         .make_audio_decoder(&track.codec_params, &DecoderOptions::default())
         .expect("Failed to create decoder");
@@ -65,7 +59,7 @@ pub async fn stream_from_source() -> Result<(), Box<dyn Error>> {
             }
         },
         |err| eprintln!("Audio stream error: {}", err),
-        Some(Duration::from_secs(10))
+        Some(Duration::from_secs(10)),
     )?;
 
     stream.play()?;

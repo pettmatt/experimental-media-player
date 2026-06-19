@@ -6,13 +6,13 @@
 		"paths": {
 			"artist": {
 				"path": "/v1/artists/",
-				"path-parameters": {},
+				"path_parameters": {},
 				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
 				"body": { "Authorization": "BEARER_TOKEN" }
 			},
 			"auth-token": {
 				"path": "/token",
-				"path-parameters": {},
+				"path_parameters": {},
 				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
 				"body": {
 					"grant_type": "client_credentials",
@@ -22,7 +22,7 @@
 			},
 			"authenticate": {
 				"path": "/authorize?",
-				"path-parameters": {
+				"path_parameters": {
 					"response_type": "code",
 					"client_id": "ENV.CLIENT_ID",
 					"scope": "user-read-private,user-read-email",
@@ -41,14 +41,17 @@
 	{
 		"url": "https://www.youtube.com/watch?v=eVTXPUF4Oz4",
 		"prefix": "YOUTUBE",
-		"enabled": false,
+		"enabled": true,
 		"paths": {
+			"base": {
+				"path": ""
+			},
 			"authenticate": {
 				"path": {
 					"main": "https://www.googleapis.com",
 					"sub": "/auth/youtube"
 				},
-				"path-parameters": {
+				"path_parameters": {
 					"response_type": "code",
 					"client_id": "ENV.CLIENT_ID",
 					"scope": "user-read-private,user-read-email",
@@ -68,7 +71,7 @@
 				"main": "https://www.googleapis.com",
 				"sub": "/youtube/v3/playlists"
 			},
-			"path-parameters": {
+			"path_parameters": {
 				"oauth2_token": "OPERATION.AUTH"
 			},
 			"headers": { "Content-Type": "application/x-www-form-urlencoded" }
@@ -78,7 +81,7 @@
 				"main": "https://www.googleapis.com",
 				"sub": "/youtube/v3/search"
 			},
-			"path-parameters": {
+			"path_parameters": {
 				"oauth2_token": "OPERATION.AUTH"
 			},
 			"headers": { "Content-Type": "application/x-www-form-urlencoded" }
