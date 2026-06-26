@@ -44,7 +44,10 @@
 		"enabled": true,
 		"paths": {
 			"base": {
-				"path": ""
+				"path": "",
+				"headers": { "Content-Type": "application/x-www-form-urlencoded" },
+				"body": {},
+				"path_parameters": {}
 			},
 			"authenticate": {
 				"path": {
