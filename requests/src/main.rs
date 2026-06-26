@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 use std::env;
 use std::{collections::HashMap, path::Path};
 use tokio;
-// use stream::stream::stream_from_source;
+use stream::stream::stream_from_source;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -16,30 +16,33 @@ struct AuthResponse {
     url: reqwest::Url,
 }
 
+// #[tokio::main]
+// async fn main() -> Result<()> {
+//     println!("start");
+//     dotenv::from_filename(".env-requests").ok();
+//     let apis = fetch_apis("./src/apis.json").unwrap();
+//     println!("APIs {:?}", apis);
+
+//     if let Some(api) = apis.get("youtube") {
+//         println!("\nExecuting for {:?}", api);
+//         let api_path = ApiPath {
+//             path: PathType::String(String::from("")),
+//             headers: http::header::HeaderMap::new(),
+//             body_parameters: HashMap::new(),
+//             path_parameters: HashMap::new(),
+//         };
+//         let response = api.get_request(&api_path).await;
+//         println!("Response: {:?}", response);
+//     }
+
+//     Ok(())
+// }
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("start");
-    dotenv::from_filename(".env-requests").ok();
-    let apis = fetch_apis("./src/apis.json").unwrap();
-    println!("APIs {:?}", apis);
+	stream_from_source(String::from("https://www.youtube.com/watch?v=eVTXPUF4Oz4")).await?;
+    println!("DONE");
 
-    if let Some(api) = apis.get("youtube") {
-        println!("\nExecuting for {:?}", api);
-        let api_path = ApiPath {
-            path: PathType::String(String::from("")),
-            headers: http::header::HeaderMap::new(),
-            body_parameters: HashMap::new(),
-            path_parameters: HashMap::new(),
-        };
-        let response = api.get_request(&api_path).await;
-        println!("Response: {:?}", response);
-    }
-
-    Ok(())
-}
-
-async fn main_s() -> Result<()> {
-    // stream_from_source();
     Ok(())
 }
 
