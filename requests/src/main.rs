@@ -7,7 +7,8 @@ use sha2::{Digest, Sha256};
 use std::env;
 use std::{collections::HashMap, path::Path};
 use tokio;
-use stream::stream::stream_from_source;
+// use stream::stream::stream_from_source;
+use stream::extract::Extractor;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -40,8 +41,16 @@ struct AuthResponse {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-	stream_from_source(String::from("https://www.youtube.com/watch?v=eVTXPUF4Oz4")).await?;
-    println!("DONE");
+	match Extractor::new().await {
+
+		Ok(inst) =>  {
+			let result = inst.resolve_audio_url(String::from("https://www.youtube.com/watch?v=eVTXPUF4Oz4")).await?;
+	    	println!("DONE, {:?}", result);
+		}
+		Err(e) => {
+        	eprintln!("Creating Extractor instance failed: {e:?}");
+    	}
+	}
 
     Ok(())
 }

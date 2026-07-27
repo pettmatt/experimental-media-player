@@ -1,0 +1,54 @@
+use std::os::unix::fs::PermissionsExt;
+use yt_dlp::model::playlist::Playlist;
+use yt_dlp::model::AudioQuality;
+use yt_dlp::Downloader;
+use yt_dlp::client::deps::Libraries;
+use std::path::PathBuf;
+
+pub struct Extractor {
+	downloader: Downloader,
+}
+
+impl Extractor {
+	pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
+		let libraries_dir = PathBuf::from("libs");
+		let output_dir = PathBuf::from("output");
+		tokio::fs::create_dir_all(&libraries_dir).await?;
+		tokio::fs::create_dir_all(&output_dir).await?;
+
+		let yt = libraries_dir.join("yt-dlp");
+		let ffmpeg = libraries_dir.join("ffmpeg");
+		let _ = std::fs::create_dir_all(&yt);
+		let _ = std::fs::create_dir_all(&ffmpeg);
+		let libraries = Libraries::new(yt, ffmpeg);
+
+		for bin in [libraries_dir.join("yt-dlp"), libraries_dir.join("ffmpeg")] {
+			let mut permissions = tokio::fs::metadata(&bin).await?.permissions();
+			permissions.set_mode(0o755);
+			tokio::fs::set_permissions(&bin, permissions).await?;
+		}
+
+		let downloader = Downloader::builder(libraries, "output")
+			.with_timeout(std::time::Duration::from_secs(20))
+			.build()
+			.await?;
+
+		Ok(Self {
+			downloader: downloader
+		})
+	}
+
+	pub async fn search_results(&self, search_term: String, result_amount: usize) -> Result<Playlist, Box<dyn std::error::Error>> {
+		let youtube = self.downloader.youtube_extractor();
+		let results = youtube.search(&search_term, result_amount).await?;
+
+		Ok(results)
+	}
+
+	pub async fn resolve_audio_url(&self, url: String) -> Result<PathBuf, Box<dyn std::error::Error>> {
+		let video = self.downloader.fetch_video_infos(url).await?;
+		let video_path = self.downloader.download_audio_stream(&video, "audio.mp3").await?;
+
+		Ok(video_path)
+	}
+}
