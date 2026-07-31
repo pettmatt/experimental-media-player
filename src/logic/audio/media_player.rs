@@ -3,18 +3,20 @@ use crate::State;
 use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 use kira::sound::FromFileError;
 use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Tween};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::Duration;
 
-pub struct MediaPlayer<'a> {
-    currently: Option<&'a Track>,
-    queue: Vec<&'a Track>,
+pub struct MediaPlayer {
+    pub currently: Option<Rc<RefCell<Track>>>,
+    queue: Vec<Rc<RefCell<Track>>>,
     controls: Controls,
     manager: Option<AudioManager<DefaultBackend>>,
     handle: Option<StreamingSoundHandle<kira::sound::FromFileError>>,
 }
 
-struct Controls {
+pub struct Controls {
     loop_pick: bool,
     rng_pick: bool,
     pause: bool,
@@ -28,7 +30,7 @@ struct Controls {
 // TODO: Add a logic that puts tracks from queue to "trash"-queue.
 // TODO: Add a logic picks random track (would use trash-queue to prevent to pick previous tracks).
 
-impl<'a> MediaPlayer<'a> {
+impl MediaPlayer {
     pub fn new() -> Self {
         Self {
             currently: None,
@@ -47,37 +49,36 @@ impl<'a> MediaPlayer<'a> {
         }
     }
 
-    pub async fn play(&mut self, source: &'a Track) -> Result<(), Box<dyn std::error::Error>> {
-        if self.controls.pause == false {
-            return Ok(());
-        }
-        self.controls.pause = false;
-        if self.currently.is_some() {
-            if let Some(current) = self.currently {
-                if current != source {
-                    self.currently = Some(source);
-                    self.queue.push(source);
-                }
-                if self.manager.is_some() {
-                    if let Some(manager) = self.manager.as_mut() {
-                        let sound_data =
-                            StreamingSoundData::from_file("./requests/output/audio.mp3")?;
-                        let handle = manager.play(sound_data)?;
-                        self.handle = Some(handle);
-                    }
-                } else {
-                    let mut manager =
-                        AudioManager::<DefaultBackend>::new(AudioManagerSettings::default())?;
-                    let sound_data = StreamingSoundData::from_file("./requests/output/audio.mp3")?;
-                    self.controls.length = Mutex::new(self.get_track_length(&sound_data));
-                    let mut handle = manager.play(sound_data)?;
-                    handle.set_volume(kira::Decibels(-3.0), Tween::default());
-                    self.manager = Some(manager);
-                    self.handle = Some(handle);
-                }
-            }
-        }
-        Ok(())
+    pub async fn play(&mut self, source: Rc<RefCell<Track>>) -> Result<(), Box<dyn std::error::Error>> {
+	    println!("Should start to play with {:?}", &source);
+	    self.controls.pause = false;
+
+	    // Stop whatever's currently playing, if anything.
+		// Play shouldn't check if it should play, it should just play.
+		// The logic to check if something should play should be checked whatever is calling play().
+	    if let Some(handle) = self.handle.as_mut() {
+	        handle.stop(Tween::default());
+	    }
+
+	    self.currently = Some(source.clone());
+
+	    let path = {
+	        let track = source.borrow();
+	        std::path::PathBuf::from(&track.path)
+	    };
+	    let sound_data = StreamingSoundData::from_file(&path)?;
+	    self.controls.length = Mutex::new(self.get_track_length(&sound_data));
+
+	    let manager = self
+	        .manager
+	        .get_or_insert_with(|| AudioManager::<DefaultBackend>::new(AudioManagerSettings::default())
+	        .expect("failed to create audio manager"));
+
+	    let mut handle = manager.play(sound_data)?;
+	    handle.set_volume(kira::Decibels(-20.0), Tween::default());
+
+	    self.handle = Some(handle);
+	    Ok(())
     }
 
     pub fn unpause(&mut self) {
@@ -98,11 +99,11 @@ impl<'a> MediaPlayer<'a> {
         self.controls.pause
     }
 
-    pub fn is_loop(&self) -> bool {
+    pub fn is_looped(&self) -> bool {
         self.controls.loop_pick
     }
 
-    pub fn is_rng(&self) -> bool {
+    pub fn is_rnged(&self) -> bool {
         self.controls.rng_pick
     }
 
@@ -146,7 +147,7 @@ impl<'a> MediaPlayer<'a> {
 
     // Checks if the track (item) is in queue and returns false if it is.
     // This can be used to prevent user from adding multiple same tracks.
-    pub fn append(&mut self, track: &'a Track, i_know: bool) -> bool {
+    pub fn add(&mut self, track: Rc<RefCell<Track>>, i_know: bool) -> bool {
         if i_know == false {
             for item in self.queue.iter() {
                 if item == &track {
@@ -160,14 +161,15 @@ impl<'a> MediaPlayer<'a> {
 
     pub fn next(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.queue.len() > 0 {
-            let track: &Track = self.queue.remove(0);
-            if let Some(manager) = self.manager.as_mut() {
-                self.currently = Some(track);
-                if let Some(current) = self.currently {
-                    let data = StreamingSoundData::from_file(current.path.clone())?;
-                    self.handle = Some(manager.play(data)?);
-                }
-            }
+            let track: Rc<RefCell<Track>> = self.queue.remove(0);
+           	self.play(track);
+            // if let Some(manager) = self.manager.as_mut() {
+            //     self.currently = Some(track);
+            //     if let Some(current) = &self.currently {
+            //         let data = StreamingSoundData::from_file(current.path.clone())?;
+            //         self.handle = Some(manager.play(data)?);
+            //     }
+            // }
         }
         Ok(())
     }

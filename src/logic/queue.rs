@@ -1,9 +1,9 @@
 use crate::{logic::data_types::{queue_item::QueueItem, track::Track}, State};
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use rand::prelude::*;
 
 pub trait Queue {
-	fn add_to_queue(&mut self, media: &Track);
+	fn add_to_queue(&mut self, media: &Rc<RefCell<Track>>);
 	fn remove_from_queue(&mut self, id: i32);
 	fn progress_queue(&mut self) -> Vec<QueueItem>;
 	fn update_playing_audio_in_queue(&mut self, index: i32) -> Option<(usize, usize)>;
@@ -11,9 +11,9 @@ pub trait Queue {
 }
 
 impl Queue for State {
-	fn add_to_queue(&mut self, track: &Track) {
+	fn add_to_queue(&mut self, track: &Rc<RefCell<Track>>) {
 		self.queue.push(QueueItem {
-			track_id: track.id,
+			track_id: track.borrow().id,
 		});
 	}
 
@@ -26,10 +26,10 @@ impl Queue for State {
 	}
 
 	fn progress_queue(&mut self) -> Vec<QueueItem> {
-		let index_map: HashMap<i32, &Track> = self.index.iter().map(|item| (item.id, item)).collect();
+		let index_map: HashMap<i32, &Rc<RefCell<Track>>> = self.index.iter().map(|item| (item.borrow().id, item)).collect();
 		let found: Option<usize> = self.queue.iter().position(|item| {
 			if let Some(track) = index_map.get(&item.track_id) {
-				return track.playing;
+				return track.borrow().playing;
 			}
 
 			false
@@ -40,16 +40,16 @@ impl Queue for State {
 
 			if index + 1 < queue_length {
 				{
-					let index_position = self.index.iter().position(|item| item.id == self.queue[index].track_id).unwrap();
+					let index_position = self.index.iter().position(|item| item.borrow().id == self.queue[index].track_id).unwrap();
 					if let Some(track) = self.index.get_mut(index_position) {
-						track.playing = false;
+						track.borrow_mut().playing = false;
 					}
 				}
 
-				let index_position = self.index.iter().position(|item| item.id == self.queue[index + 1].track_id).unwrap();
+				let index_position = self.index.iter().position(|item| item.borrow().id == self.queue[index + 1].track_id).unwrap();
 
 				if let Some(track) = self.index.get_mut(index_position) {
-					track.playing = true;
+					track.borrow_mut().playing = true;
 				}
 			}
 
