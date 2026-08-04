@@ -43,7 +43,10 @@ export component MainList {
 			        Menu {
 			            MenuItem {
 			                title: @tr("Add to queue");
-			                activated => { debug("Add to queue"); }
+			                activated => {
+								debug("Add to queue");
+								MediaActions.add_to_queue(media.id);
+							}
 			            }
 			            Menu {
 			                title: @tr("Add to playlist");

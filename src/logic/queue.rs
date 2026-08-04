@@ -64,7 +64,7 @@ impl Queue for State {
 	}
 
 	fn update_playing_audio_in_queue(&mut self, offset: i32) -> Option<(usize, usize)> {
-		let index = self.playing.queue_index.unwrap();
+		let index = self.timeline.queue_index.unwrap();
 		let next_index = index + offset as usize;
 		// There might be cases where audio is not playing before this function is executed.
 		self.set_index_playing(index, false);

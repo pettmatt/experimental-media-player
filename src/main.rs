@@ -38,13 +38,40 @@ struct TimeLine {
 }
 
 impl TimeLine {
-    pub fn update_timeline(&mut self, track: &Track) {
-        self.length = track.duration;
+	pub fn set_timeline(&mut self, track: Rc<RefCell<Track>>, globals: SlintState) {
+        self.length = track.borrow().duration;
         self.current = 0;
+        self.media_index = Some(track.borrow().id as usize);
+        let timeline: SlintTimeline = self.convert_timeline_to_slint();
+        globals.set_timeline(timeline);
     }
 
-    pub fn update_position(&mut self, value: i32) {
+    pub fn update_timeline(&mut self, value: i32, globals: SlintState) {
         self.current = value;
+        let timeline: SlintTimeline = self.convert_timeline_to_slint();
+        globals.set_timeline(timeline);
+    }
+
+    fn convert_timeline_to_slint(&self) -> slint_generatedAppWindow::SlintTimeline {
+	    slint_generatedAppWindow::SlintTimeline {
+			current: self.current,
+			length: self.length,
+	        str_current: SharedString::from(self.format_into_time(self.current as f64)),
+	        str_length: SharedString::from(self.format_into_time(self.length as f64)),
+	    }
+    }
+
+    fn format_into_time(&self, seconds: f64) -> String {
+    	let total = seconds.max(0.0).round() as u64;
+     	let hours = total / 3600;
+      	let minutes = (total % 3600) / 60;
+       	let secs = total % 60;
+
+        if hours > 0 {
+        	format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+        } else {
+            format!("{}:{:02}", minutes, secs)
+        }
     }
 }
 
@@ -52,10 +79,12 @@ impl TimeLine {
 pub struct State {
     index: Vec<Rc<RefCell<Track>>>,
     queue: Vec<QueueItem>, // Because Rodio doesn't offer frexible way to interact with the queue, we're managing by deleting the queue, whenever we want to make a change.
-    playing: TimeLine,
+    trash_queue: Vec<QueueItem>,
+    timeline: TimeLine,
     playlists: Vec<Playlist>,
     // 	sources: Vec<String>,
     // 	settings: Settings,
+    volume: f32,
 }
 
 impl State {
@@ -84,6 +113,31 @@ impl State {
     fn set_new_playlist(&mut self, globals: &SlintState) {
         let playlists: Vec<SlintPlaylist> = self.convert_playlist_to_slint();
         globals.set_playlist(ModelRc::from(&playlists[..]));
+    }
+
+    fn add_to_queue(&mut self, track_id: i32, i_know: bool) -> bool {
+    	if i_know {
+	    	if let Some(track) = self.index
+	     		.iter()
+	       		.find(|t| t.borrow().id == track_id)
+	     	{
+	        	self.queue.push(QueueItem { track_id: track.borrow().id });
+	         	println!("Queue {:?}", self.queue.len());
+	     	}
+
+			return true;
+     	}
+
+     	false
+    }
+
+    fn index_playing_reset(&mut self) {
+    	for t in self.index.iter_mut() {
+     		let mut track = t.borrow_mut();
+     		if track.playing {
+       			track.playing = false;
+       		}
+     	}
     }
 
     fn add_to_playlist(&mut self, playlist_id: i32, media_id: i32, globals: &SlintState) {
@@ -227,8 +281,8 @@ impl State {
                 track.borrow_mut().playing = value;
 
                 if value {
-                    self.playing.media_index = Some(track_index);
-                    self.playing.queue_index = Some(index);
+                    self.timeline.media_index = Some(track_index);
+                    self.timeline.queue_index = Some(index);
                 }
 
                 return Some(());

@@ -1,18 +1,22 @@
 import { HorizontalBox, VerticalBox, Button, Slider } from "std-widgets.slint";
-import { MediaActions, SlintState, SlintTimeLine } from "data-flow.slint";
+import { MediaActions, SlintState, SlintTimeline } from "data-flow.slint";
 import { VolumeSlider } from "components/volume-slider.slint";
 
 export component MediaControllers {
-	in property<SlintTimeLine> playing;
+	in property<SlintTimeline> playing;
+	property<bool> dragging;
+
+	in-out property<float> volume: 50;
+	property <bool> hovering: hover_zone.has-hover;
 
 	Timer {
 		property<int> count: 0;
 		interval: 1000ms;
-		running: SlintState.timeline.length > 0
-			? true
-			: false;
+		running: SlintState.timeline.length > 0 ? true : false;
 		triggered() => {
-			MediaActions.media_get_track_position();
+			if !dragging && playing.current != playing.length {
+				MediaActions.media_get_track_position();
+			}
 		}
 	}
 
@@ -26,50 +30,59 @@ export component MediaControllers {
 			Button { text: @tr("start"); clicked => { MediaActions.media_toggle() } }
 			Button { text: @tr("next"); clicked => { MediaActions.media_change(1) } }
 			Button { text: @tr("loop"); clicked => { MediaActions.media_loop() } }
-			Rectangle {
-				bg := Rectangle {
-					width: 25px;
-					height: 25px;
-					background: Colors.pink;
+			hover_zone := TouchArea {
+				width: 124px;
+				height: 24px;
+				// Image {
+				// 	width: 24px;
+				// 	height: 24px;
+				// 	source: @image-url("volume-icon.svg");
+				// }
+				HorizontalLayout {
+					spacing: 8px;
 
-					ta := TouchArea {
-						height: vs.visible
-							? parent.height + vs.height
-							: parent.height;
+					Rectangle {
+						width: 32px;
+						height: 32px;
+						background: Colors.pink;
 					}
 
-					vs := VolumeSlider {
-						settings: SlintState.settings;
-						width: parent.width;
-						y: -parent.height / 2 - 5px;
-						released(_) => {
-							bg.background = Colors.beige;
-							vs.visible = false;
+					volume_slider := Slider {
+						// orientation: Orientation.vertical;
+		      			width: hovering ? 100px : 0px;
+		                opacity: hovering ? 1.0 : 0.0;
+		                value <=> root.volume;
+						step: 0.1;
+		                animate width, opacity { duration: 150ms; }
+						changed(value) => {
+							MediaActions.media_change_volume(value)
 						}
 					}
 				}
-
-				states [
-					inactive when !ta.has-hover && !vs.has-focus: {
-						bg.background: Colors.beige;
-						vs.visible: false;
-					}
-					active-hover when ta.has-hover || vs.has-focus: {
-						bg.background: Colors.aqua;
-						vs.visible: true;
-					}
-				]
 			}
 		}
 
-		HorizontalBox {
-			Text { text: playing.current / 60; }
+		VerticalBox {
 			Slider {
 				width: 90%;
 				height: 10px;
-				value: playing.current / playing.length / 60;
+				value: playing.current;
+				minimum: 0.0;
+				maximum: playing.length;
+				changed(_) => {
+					dragging = true;
+					MediaActions.media_pause();
+				}
+				released(position) => {
+					dragging = false;
+					MediaActions.media_change_track_position(position);
+					MediaActions.media_toggle();
+				}
 			}
-			Text { text: playing.length / 60; }
+			HorizontalBox {
+				Text { text: playing.str_current; horizontal-alignment: left; }
+				Text { text: playing.str_length; horizontal-alignment: right; }
+			}
 		}
 	}
 }

@@ -1,19 +1,23 @@
+use crate::logic::data_types::queue_item::QueueItem;
 use crate::logic::data_types::track::Track;
 use crate::State;
 use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 use kira::sound::FromFileError;
 use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Tween};
 use std::cell::RefCell;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::rc::Rc;
 use std::sync::Mutex;
 use std::time::Duration;
 
 pub struct MediaPlayer {
+	pub global_state: Rc<RefCell<State>>,
+	pub generation: u64,
     pub currently: Option<Rc<RefCell<Track>>>,
-    queue: Vec<Rc<RefCell<Track>>>,
     controls: Controls,
     manager: Option<AudioManager<DefaultBackend>>,
-    handle: Option<StreamingSoundHandle<kira::sound::FromFileError>>,
+    pub handle: Option<StreamingSoundHandle<kira::sound::FromFileError>>,
+    pub end_timer: Option<slint::Timer>,
 }
 
 pub struct Controls {
@@ -31,10 +35,12 @@ pub struct Controls {
 // TODO: Add a logic picks random track (would use trash-queue to prevent to pick previous tracks).
 
 impl MediaPlayer {
-    pub fn new() -> Self {
+    pub fn new(state: Rc<RefCell<State>>) -> Self {
+    	let mut hasher = DefaultHasher::new();
+     	5678.hash(&mut hasher);
         Self {
+        	global_state: state,
             currently: None,
-            queue: Vec::new(),
             manager: None,
             handle: None,
             controls: Controls {
@@ -46,11 +52,14 @@ impl MediaPlayer {
                 position: Mutex::new(Duration::new(0, 0)),
                 length: Mutex::new(Duration::new(0, 0)),
             },
+       		generation: hasher.finish(),
+         	end_timer: None
         }
     }
 
     pub async fn play(&mut self, source: Rc<RefCell<Track>>) -> Result<(), Box<dyn std::error::Error>> {
 	    println!("Should start to play with {:?}", &source);
+		self.global_state.borrow_mut().index_playing_reset();
 	    self.controls.pause = false;
 
 	    // Stop whatever's currently playing, if anything.
@@ -66,6 +75,8 @@ impl MediaPlayer {
 	        let track = source.borrow();
 	        std::path::PathBuf::from(&track.path)
 	    };
+
+		source.borrow_mut().playing = true;
 	    let sound_data = StreamingSoundData::from_file(&path)?;
 	    self.controls.length = Mutex::new(self.get_track_length(&sound_data));
 
@@ -75,7 +86,8 @@ impl MediaPlayer {
 	        .expect("failed to create audio manager"));
 
 	    let mut handle = manager.play(sound_data)?;
-	    handle.set_volume(kira::Decibels(-20.0), Tween::default());
+		let volume = normalize_volume(self.global_state.borrow().volume, 0.0, 100.0, -60.0, 0.0); // Was -20.0
+	    handle.set_volume(kira::Decibels(volume), Tween::default());
 
 	    self.handle = Some(handle);
 	    Ok(())
@@ -131,7 +143,6 @@ impl MediaPlayer {
 
     pub fn clear(&mut self) {
         self.currently = None;
-        self.queue = Vec::new();
         self.controls.position = Mutex::new(Duration::new(0, 0));
         self.manager = None;
         self.handle = None;
@@ -141,44 +152,42 @@ impl MediaPlayer {
         *self.controls.volume.lock().unwrap()
     }
 
-    pub fn set_volume(&self, value: f32) {
+    pub fn set_volume(&mut self, value: f32) {
+    	if let Some(handle) = self.handle.as_mut() {
+     		let volume = normalize_volume(value, 0.0, 100.0, -60.0, 10.0);
+    		handle.set_volume(kira::Decibels(volume), Tween::default());
+     	}
         *self.controls.volume.lock().unwrap() = value;
     }
 
-    // Checks if the track (item) is in queue and returns false if it is.
-    // This can be used to prevent user from adding multiple same tracks.
-    pub fn add(&mut self, track: Rc<RefCell<Track>>, i_know: bool) -> bool {
-        if i_know == false {
-            for item in self.queue.iter() {
-                if item == &track {
-                    return false;
-                }
+    pub fn next(&mut self) -> Result<Option<Rc<RefCell<Track>>>, Box<dyn std::error::Error>> {
+        if self.global_state.borrow().queue.len() > 1 {
+            let item: QueueItem = self.global_state.borrow_mut().queue.remove(0);
+            let found = self.global_state.borrow().find_source_by_id(item.track_id);
+            if let Some((_, track)) = found {
+          		return Ok(Some(track));
+            } else {
+            	println!("Something went wrong, couldn't find next track {}", item.track_id);
             }
         }
-        self.queue.push(track);
-        true
+        Ok(None)
     }
 
-    pub fn next(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.queue.len() > 0 {
-            let track: Rc<RefCell<Track>> = self.queue.remove(0);
-           	self.play(track);
-            // if let Some(manager) = self.manager.as_mut() {
-            //     self.currently = Some(track);
-            //     if let Some(current) = &self.currently {
-            //         let data = StreamingSoundData::from_file(current.path.clone())?;
-            //         self.handle = Some(manager.play(data)?);
-            //     }
-            // }
-        }
-        Ok(())
+    pub fn previous(&mut self) -> Result<Option<Rc<RefCell<Track>>>, Box<dyn std::error::Error>>  {
+	    if self.global_state.borrow().trash_queue.len() > 1 {
+			if let Some(item) = self.global_state.borrow().trash_queue.last() {
+		        let found = self.global_state.borrow().find_source_by_id(item.track_id);
+		        if let Some((_, track)) = found {
+		      		return Ok(Some(track));
+		        } else {
+		        	println!("Something went wrong, couldn't find previous track {}", item.track_id);
+		        }
+			}
+	    }
+	    Ok(None)
     }
 
-    pub fn previous(&mut self, state: &mut State) {}
-
-    pub fn clear_queue(&self) {}
-
-    fn load_queue_from_state(&mut self, state: &State) {
+    // fn load_queue_from_state(&mut self, state: &State) {
         // self.queue = state.queue.clone();
 
         // for item in self.queue.iter() {
@@ -186,7 +195,7 @@ impl MediaPlayer {
         // 		self.add_to_queue(&state, media_file);
         // 	}
         // }
-    }
+    // }
 
     pub fn try_seek(&mut self, position: f64) {
         if let Some(handle) = self.handle.as_mut() {
@@ -209,4 +218,8 @@ impl MediaPlayer {
     }
 
     pub async fn callback_after_audio_ends(&self, callback: fn()) {}
+}
+
+fn normalize_volume(value: f32, in_min: f32, in_max: f32, out_min: f32, out_max: f32) -> f32 {
+	out_min + (value - in_min) * (out_max - out_min) / (in_max - in_min)
 }

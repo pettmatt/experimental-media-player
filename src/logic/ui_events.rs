@@ -5,7 +5,7 @@ use crate::logic::database;
 use crate::logic::queue::Queue;
 use crate::logic::validate_sources;
 use crate::{AppWindow, ContextMenuActions, MediaActions, SettingActions, SlintState, State};
-use slint::{ComponentHandle};
+use slint::ComponentHandle;
 use std::{cell::RefCell, rc::Rc};
 
 pub fn handle_initialization(state: &mut State) {
@@ -39,7 +39,7 @@ pub fn handle_passing_values(app: &AppWindow, state: &mut State) {
 }
 
 pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
-    let player = Rc::new(RefCell::new(MediaPlayer::new()));
+    let player = Rc::new(RefCell::new(MediaPlayer::new(state.clone())));
     let global_media_actions = app.global::<MediaActions>();
     let global_setting_actions = app.global::<SettingActions>();
     let global_context_menu_actions = app.global::<ContextMenuActions>();
@@ -50,33 +50,43 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
         let app_clone = weak_app.clone();
         let state_clone = Rc::clone(state);
         let player_clone = Rc::clone(&player);
-       	let index_clone = state_clone.borrow().index.clone();
+        let index_clone = state_clone.borrow().index.clone();
 
         move |id: i32| {
-       		println!("Media start triggered! On track id : {}", &id);
+            println!("Media start triggered! On track id : {}", &id);
+        	let timer = slint::Timer::default;
+
             if let Some((index, track)) = index_clone
                 .iter()
                 .enumerate()
                 .find(|(_, item)| item.borrow().id == id)
             {
-                state_clone.borrow_mut().add_to_queue(track);
-
                 let player_temp_clone = player_clone.clone();
                 let track_temp_clone = track.clone();
+                let track_for_timeline = track.clone();
+                let app_timeline_clone = app_clone.clone();
+                let state_timeline_clone = state_clone.clone();
+
                 slint::spawn_local(async move {
-	                audio_control_events::handle_media_start(player_temp_clone, track_temp_clone).await;
-                }).unwrap();
+                    audio_control_events::handle_media_start(player_temp_clone, track_temp_clone)
+                        .await;
+      		        if let Some(app) = app_timeline_clone.upgrade() {
+             			let global_state = app.global::<SlintState>();
+						state_timeline_clone.borrow_mut().timeline.set_timeline(track_for_timeline.clone(), global_state);
+			        }
+                })
+                .unwrap();
 
                 if let Some(app) = app_clone.upgrade() {
-                	state_clone.borrow_mut().set_queue(None, &app.global::<SlintState>());
-                    state_clone.borrow_mut().playing.media_index = Some(index);
+                    state_clone.borrow_mut().set_queue(None, &app.global::<SlintState>());
+                    state_clone.borrow_mut().timeline.media_index = Some(index);
                     let temp_queue = state_clone.borrow().queue.clone();
                     if let Some((queue_index, _)) = temp_queue
                         .iter()
                         .enumerate()
                         .find(|(_, queue_item)| queue_item.track_id == track.borrow().id)
                     {
-                        state_clone.borrow_mut().playing.queue_index = Some(queue_index);
+                        state_clone.borrow_mut().timeline.queue_index = Some(queue_index);
                     }
                 }
             }
@@ -115,35 +125,41 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
     //         }
     //     }
     // });
+    global_media_actions.on_media_pause({
+        let mut player_clone = Rc::clone(&player);
+        move || audio_control_events::handle_media_pause(&mut player_clone)
+    });
     global_media_actions.on_media_toggle({
         let mut player_clone = Rc::clone(&player);
         move || audio_control_events::handle_media_toggle(&mut player_clone)
     });
     global_media_actions.on_media_change_volume({
         let mut player_clone = Rc::clone(&player);
-        move |volume: i32| audio_control_events::handle_media_volume(&mut player_clone, volume)
+        let mut state_clone = Rc::clone(state);
+        move |volume: f32| audio_control_events::handle_media_volume(&mut player_clone, &mut state_clone, volume)
     });
     global_media_actions.on_media_change_track_position({
         let mut player_clone = Rc::clone(&player);
         move |position| {
             let duration_position = position as f64;
-            audio_control_events::change_current_track_position(
-                &mut player_clone,
-                duration_position,
-            );
+            audio_control_events::change_current_track_position(&mut player_clone, duration_position);
         }
     });
     global_media_actions.on_media_get_track_position({
+    	let app_clone = weak_app.clone();
         let state_clone = Rc::clone(state);
         let player_clone = Rc::clone(&player);
 
         move || {
             println!("(Event) Get track triggered");
-            let value = audio_control_events::get_current_track_position(&player_clone);
-            state_clone
-                .borrow_mut()
-                .playing
-                .update_position(value as i32);
+        	if let Some(app) = app_clone.upgrade() {
+	            let value = audio_control_events::get_current_track_position(&player_clone);
+	            let global_state = app.global::<SlintState>();
+	            state_clone
+	                .borrow_mut()
+	                .timeline
+	                .update_timeline(value as i32, global_state);
+         	}
         }
     });
     global_media_actions.on_media_mix({
@@ -154,6 +170,10 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
             state_clone.borrow_mut().shuffle();
             audio_control_events::handle_media_mix(&player_clone);
         }
+    });
+    global_media_actions.on_add_to_queue({
+        let state_clone = Rc::clone(&state);
+        move |id: i32| audio_control_events::handle_add_media_queue(&state_clone, id)
     });
     global_media_actions.on_add_to_playlist({
         let app_clone = weak_app.clone();
@@ -197,13 +217,13 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
                     // }
 
                     let records = source::read_source(source).expect("Couldn't fetch all files");
-         			if database::add_records(records.clone()).is_ok() {
-            			state_clone.borrow_mut().merge_to_index(records);
-						if let Some(app) = app_clone.upgrade() {
-							let global_state = app.global::<SlintState>();
-							state_clone.borrow_mut().set_index(None, &global_state);
-						}
-					};
+                    if database::add_records(records.clone()).is_ok() {
+                        state_clone.borrow_mut().merge_to_index(records);
+                        if let Some(app) = app_clone.upgrade() {
+                            let global_state = app.global::<SlintState>();
+                            state_clone.borrow_mut().set_index(None, &global_state);
+                        }
+                    };
                 }
                 None => println!("Didn't receive a path. Result should be None: {:?}", source),
             }
@@ -211,110 +231,138 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
     });
 
     global_context_menu_actions.on_create_new_playlist({
-    	use crate::Playlist;
-     	let app_clone = weak_app.clone();
-    	let state_clone = Rc::clone(state);
+        use crate::Playlist;
+        let app_clone = weak_app.clone();
+        let state_clone = Rc::clone(state);
 
-     	move || {
-      		let playlists = database::get_table::<Playlist>();
-        	let playlist_count = if playlists.is_ok() {
-         		playlists.unwrap().len() + 1
-        	} else { 0 };
-         	let name = format!("Playlist {playlist_count}");
+        move || {
+            let playlists = database::get_table::<Playlist>();
+            let playlist_count = if playlists.is_ok() {
+                playlists.unwrap().len() + 1
+            } else {
+                0
+            };
+            let name = format!("Playlist {playlist_count}");
 
-			let new_entry = Playlist {
-				id: 0,
-				name,
-				artist: None,
-				list_type: "playlist".to_string(),
-				image_url: "".to_string(),
-				created_at: "".to_string(),
-				listened_at: "".to_string(),
-				sources: None,
-				tracks: None,
-			};
+            let new_entry = Playlist {
+                id: 0,
+                name,
+                artist: None,
+                list_type: "playlist".to_string(),
+                image_url: "".to_string(),
+                created_at: "".to_string(),
+                listened_at: "".to_string(),
+                sources: None,
+                tracks: None,
+            };
 
-			if database::add_record(new_entry.clone()).is_ok() {
-				state_clone.borrow_mut().playlists.push(new_entry);
-				if let Some(app) = app_clone.upgrade() {
-					let global_state = app.global::<SlintState>();
-					state_clone.borrow_mut().set_new_playlist(&global_state);
-				}
-			};
-      	}
+            if database::add_record(new_entry.clone()).is_ok() {
+                state_clone.borrow_mut().playlists.push(new_entry);
+                if let Some(app) = app_clone.upgrade() {
+                    let global_state = app.global::<SlintState>();
+                    state_clone.borrow_mut().set_new_playlist(&global_state);
+                }
+            };
+        }
     });
 }
 
 pub mod audio_control_events {
     use crate::{
-        logic::{
-            audio::media_player::MediaPlayer,
-            data_types::track::Track
-        },
+        logic::{audio::media_player::MediaPlayer, data_types::track::Track},
         State,
     };
-    use std::{cell::{RefCell}, rc::Rc};
+    use std::{cell::RefCell, rc::Rc};
 
     pub fn handle_media_toggle(media_player: &mut Rc<RefCell<MediaPlayer>>) {
         if media_player.borrow().is_paused() {
-        	media_player.borrow_mut().unpause();
+            media_player.borrow_mut().unpause();
         } else {
-       		media_player.borrow_mut().pause();
+            media_player.borrow_mut().pause();
         }
     }
 
-    pub async fn handle_media_start(media_player: Rc<RefCell<MediaPlayer>>, track: Rc<RefCell<Track>>) {
-    	println!("Started!!!!");
-        let _ = media_player.borrow_mut().play(track).await;
+    pub fn handle_media_pause(media_player: &mut Rc<RefCell<MediaPlayer>>) {
+    	if !media_player.borrow().is_paused() {
+     		media_player.borrow_mut().pause();
+     	}
     }
 
-    pub fn handle_media_change(
-        media_player: &mut Rc<RefCell<MediaPlayer>>,
-        track: Rc<RefCell<Track>>,
-        (previous_index, current_index): (usize, usize),
-    ) {
+    pub async fn handle_media_start(media_player: Rc<RefCell<MediaPlayer>>, track: Rc<RefCell<Track>>) {
+        let _ = media_player.borrow_mut().play(track).await;
+        let watch_p = media_player.clone();
+        let timer = watch_track_ending(watch_p, media_player.borrow().generation,
+       	);
+        media_player.clone().borrow_mut().end_timer = Some(timer);
+    }
+
+    fn watch_track_ending(media_player: Rc<RefCell<MediaPlayer>>, generation: u64) -> slint::Timer {
+        let timer = slint::Timer::default();
+        let timer_p = media_player.clone();
+
+        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(250), move || {
+            let p = timer_p.borrow();
+            if p.generation != generation {
+                return;
+            }
+
+            let finished = match p.handle.as_ref() {
+                Some(handle) => matches!(handle.state(), kira::sound::PlaybackState::Stopped),
+                None => true,
+            };
+
+            if finished {
+                println!("Track finished");
+                drop(p);
+                handle_media_change(media_player.clone(), (0, 0));
+            }
+        });
+
+        timer
+    }
+
+    pub fn handle_media_change(media_player: Rc<RefCell<MediaPlayer>>, (previous_index, current_index): (usize, usize)) {
         // If the queue moved only by one, skip to next track
-        // let difference = previous_index.saturating_sub(current_index);
-        // if difference == 1 || difference == usize::MIN {
-        //     media_player.borrow_mut().next();
-        // }
-        // Else the queue needs to be remade within the media player
-        let _ = media_player.borrow_mut().play(track);
+        let difference = previous_index.saturating_sub(current_index);
+        if difference == 1 || difference == usize::MIN {
+            if let Ok(Some(track)) = media_player.borrow_mut().next() {
+            	handle_media_start(media_player.clone(), track);
+            }
+        }
+        // Else the queue needs to be remade within the media player, if the queue is loopable.
     }
 
     pub fn handle_media_loop(media_player: &mut Rc<RefCell<MediaPlayer>>) {
         println!("create_loop action triggered");
         if media_player.borrow().is_looped() {
-       		media_player.borrow_mut().set_queue_loop(false);
+            media_player.borrow_mut().set_queue_loop(false);
         } else {
-        	media_player.borrow_mut().set_queue_loop(true);
+            media_player.borrow_mut().set_queue_loop(true);
         }
     }
 
     pub fn handle_media_mix(media_player: &Rc<RefCell<MediaPlayer>>) {
-	    if media_player.borrow().is_rnged() {
-	   		media_player.borrow_mut().set_queue_rng(false);
-	    } else {
-	    	media_player.borrow_mut().set_queue_rng(true);
-	    }
-    }
-
-    pub fn handle_media_volume(media_player: &mut Rc<RefCell<MediaPlayer>>, volume: i32) {
-        println!("(event) Volume change action triggered");
-        media_player.borrow().set_volume(volume as f32);
-    }
-
-    pub fn handle_add_media_queue(
-        media_player: Rc<RefCell<MediaPlayer>>,
-        track: Rc<RefCell<Track>>,
-        state: &mut State,
-    ) {
-    	// Add logic that uses different append logic if index is included.
-        let was_added = media_player.borrow_mut().add(track, false);
-        if !was_added {
-        	// Prompt user with a box if they want to add the track again.
+        if media_player.borrow().is_rnged() {
+            media_player.borrow_mut().set_queue_rng(false);
         } else {
-        	// Do something if necessary to reflect changes on the UI.
+            media_player.borrow_mut().set_queue_rng(true);
+        }
+    }
+
+    pub fn handle_media_volume(media_player: &Rc<RefCell<MediaPlayer>>, state: &Rc<RefCell<State>>, volume: f32) {
+        println!("(event) Volume change action triggered");
+        state.borrow_mut().volume = volume.clone();
+        media_player.borrow_mut().set_volume(volume);
+    }
+
+    pub fn handle_add_media_queue(state: &Rc<RefCell<State>>, id: i32) {
+        // Add logic that uses different append logic if index is included.
+        let was_added = state.borrow_mut().add_to_queue(id, false);
+        if !was_added {
+            // Prompt user with a box if they want to add the track again.
+            // state.add_to_queue(id, true);
+        } else {
+            // Do something if necessary to reflect changes on the UI.
         }
     }
 
@@ -325,9 +373,7 @@ pub mod audio_control_events {
         media_player.borrow_mut().try_seek(position);
     }
 
-    pub fn get_current_track_position(
-    	media_player: &Rc<RefCell<MediaPlayer>>
-    ) -> f64 {
+    pub fn get_current_track_position(media_player: &Rc<RefCell<MediaPlayer>>) -> f64 {
         media_player.borrow_mut().get_position()
     }
 }
