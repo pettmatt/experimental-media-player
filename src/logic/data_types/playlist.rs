@@ -1,4 +1,4 @@
-use crate::logic::data_types::{source::Source, Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{source::Source, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 

@@ -19,6 +19,9 @@ slint::include_modules!();
 fn main() -> Result<(), Box<dyn Error>> {
     let app = AppWindow::new()?;
     let mut state = State::default();
+    if state.volume == 0.0 {
+    	state.volume = 50.0;
+    }
 
     ui::handle_initialization(&mut state);
     ui::handle_passing_values(&app, &mut state);
@@ -108,6 +111,17 @@ impl State {
             self.queue, media_queue
         );
         globals.set_queue(ModelRc::from(&media_queue[..]));
+    }
+
+   	pub fn set_volume(&mut self, globals: &SlintState) {
+        globals.set_volume(self.volume);
+    }
+
+    pub fn set_current_track(&mut self, globals: &SlintState) {
+  		if let Some(track) = self.convert_track() {
+       		globals.set_current_track(track);
+        	println!("globals {:?}", globals.get_current_track());
+    	}
     }
 
     fn set_new_playlist(&mut self, globals: &SlintState) {
@@ -225,6 +239,29 @@ impl State {
             })
             .collect()
     }
+
+	pub fn convert_track(&self) -> Option<slint_generatedAppWindow::SlintTrack> {
+		println!("LKASJDKLAS :: {:?}", self.queue.first());
+		if let Some(item) = self.queue.first() {
+			println!("LKASJDKLAS 2 :: {:?}", self.find_source_by_id(item.track_id));
+	  		if let Some((_, t)) = self.find_source_by_id(item.track_id) {
+          		return Some(slint_generatedAppWindow::SlintTrack {
+                    id: t.borrow().id,
+                    title: t.borrow().title.clone().into(),
+                    artist: t.borrow().artist.clone().into(),
+                    path: t.borrow().path.clone().into(),
+                    genre: t.borrow().genre.clone().into(),
+                    year: t.borrow().year as i32,
+                    extension: t.borrow().extension.clone().into(),
+                    file_size: t.borrow().file_size,
+                    duration: t.borrow().duration,
+                    playing: t.borrow().playing,
+                });
+	    	}
+		}
+
+     	None
+	}
 
     pub fn convert_playlist_to_slint(&self) -> Vec<slint_generatedAppWindow::SlintPlaylist> {
         self.playlists

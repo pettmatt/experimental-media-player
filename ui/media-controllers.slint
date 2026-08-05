@@ -1,12 +1,13 @@
 import { HorizontalBox, VerticalBox, Button, Slider } from "std-widgets.slint";
 import { MediaActions, SlintState, SlintTimeline } from "data-flow.slint";
 import { VolumeSlider } from "components/volume-slider.slint";
+import { CurrentlyPlaying } from "components/currently-playing.slint";
 
 export component MediaControllers {
 	in property<SlintTimeline> playing;
 	property<bool> dragging;
 
-	in-out property<float> volume: 50;
+	in-out property<float> volume: SlintState.volume;
 	property <bool> hovering: hover_zone.has-hover;
 
 	Timer {
@@ -60,6 +61,12 @@ export component MediaControllers {
 					}
 				}
 			}
+		}
+
+		CurrentlyPlaying {
+			height: SlintState.current_track.playing ? 10px : 0px;
+			track: SlintState.current_track;
+			animate height, opacity { duration: 150ms; }
 		}
 
 		VerticalBox {

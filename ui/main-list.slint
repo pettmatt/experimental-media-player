@@ -15,6 +15,7 @@ export component MainList {
 
 			for media in list: TouchArea {
 				clicked => {
+					MediaActions.add_to_queue(media.id);
 					MediaActions.media_start(media.id);
 				}
 

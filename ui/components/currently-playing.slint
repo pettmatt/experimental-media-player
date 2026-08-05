@@ -1,3 +1,9 @@
+import { SlintTrack } from "../data-flow.slint";
+
 export component CurrentlyPlaying {
-	Text { text: "Currently playing"; }
+	in property<SlintTrack> track;
+
+	if track.playing: Text {
+		text: track.title + " - " + track.artist;
+	}
 }

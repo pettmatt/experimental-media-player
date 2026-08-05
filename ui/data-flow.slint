@@ -23,7 +23,7 @@ export struct SlintTimeline {
 }
 
 export struct SlintSettings {
-	volume_preset: int,
+	volume_preset: float
 }
 
 export struct SlintPlaylist {
@@ -48,6 +48,8 @@ export global SlintState {
 	in property<[SlintPlaylist]> playlist;
 	in property<SlintTimeline> timeline;
 	in property<SlintSettings> settings;
+	in property<SlintTrack> current_track;
+	in property<float> volume;
 }
 
 export global SettingActions {
@@ -63,6 +65,7 @@ export global MediaActions {
 	callback media_mix();
 	callback add_to_queue(int);
 	callback add_to_playlist(int, int);
+	callback get_playing_track() -> SlintTrack;
 
 	callback media_change_track_position(int);
 	callback media_get_track_position();

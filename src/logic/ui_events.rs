@@ -8,6 +8,8 @@ use crate::{AppWindow, ContextMenuActions, MediaActions, SettingActions, SlintSt
 use slint::ComponentHandle;
 use std::{cell::RefCell, rc::Rc};
 
+// Todo: restructure the whole file and stream line it. Too messy to work with after a while.
+
 pub fn handle_initialization(state: &mut State) {
     // Initialize database or restore previous session
     if database::initialize_tables().is_ok() {
@@ -36,6 +38,7 @@ pub fn handle_passing_values(app: &AppWindow, state: &mut State) {
     let global_state = app.global::<SlintState>();
     state.set_index(Some(state.index.clone()), &global_state);
     state.set_queue(Some(state.queue.clone()), &global_state);
+    state.set_volume(&global_state);
 }
 
 pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
@@ -55,12 +58,14 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
         move |id: i32| {
             println!("Media start triggered! On track id : {}", &id);
         	let timer = slint::Timer::default;
+         	state_clone.borrow_mut().index_playing_reset();
 
             if let Some((index, track)) = index_clone
                 .iter()
                 .enumerate()
                 .find(|(_, item)| item.borrow().id == id)
             {
+            	track.borrow_mut().playing = true;
                 let player_temp_clone = player_clone.clone();
                 let track_temp_clone = track.clone();
                 let track_for_timeline = track.clone();
@@ -78,7 +83,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
                 .unwrap();
 
                 if let Some(app) = app_clone.upgrade() {
-                    state_clone.borrow_mut().set_queue(None, &app.global::<SlintState>());
+                	state_clone.borrow_mut().set_current_track(&app.global::<SlintState>());
                     state_clone.borrow_mut().timeline.media_index = Some(index);
                     let temp_queue = state_clone.borrow().queue.clone();
                     if let Some((queue_index, _)) = temp_queue
@@ -294,6 +299,7 @@ pub mod audio_control_events {
         let timer = watch_track_ending(watch_p, media_player.borrow().generation,
        	);
         media_player.clone().borrow_mut().end_timer = Some(timer);
+
     }
 
     fn watch_track_ending(media_player: Rc<RefCell<MediaPlayer>>, generation: u64) -> slint::Timer {
@@ -357,7 +363,7 @@ pub mod audio_control_events {
 
     pub fn handle_add_media_queue(state: &Rc<RefCell<State>>, id: i32) {
         // Add logic that uses different append logic if index is included.
-        let was_added = state.borrow_mut().add_to_queue(id, false);
+        let was_added = state.borrow_mut().add_to_queue(id, true);
         if !was_added {
             // Prompt user with a box if they want to add the track again.
             // state.add_to_queue(id, true);
