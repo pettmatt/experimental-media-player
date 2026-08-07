@@ -58,8 +58,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 				FOREIGN KEY(track_id) REFERENCES tracks(id) ON DELETE CASCADE
 			);",
             "CREATE TABLE IF NOT EXISTS settings (
-				id			INTEGER PRIMARY KEY AUTOINCREMENT,
-				name		TEXT NOT NULL,
+				name		TEXT NOT NULL PRIMARY KEY,
 				value		TEXT,
 				default_value	TEXT,
 				updated_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
@@ -88,7 +87,6 @@ pub fn initialize_tables() -> Result<(), ()> {
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
 			"CREATE TABLE IF NOT EXISTS playlist_tracks (
-				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				playlist_id INTEGER NOT NULL,
 				track_id INTEGER NOT NULL,
 				PRIMARY KEY (playlist_id, track_id),

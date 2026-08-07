@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioEntry {
 	pub id: i32,
+	// pub path: String,
 	pub added_at: String,
 }
 

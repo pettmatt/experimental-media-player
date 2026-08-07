@@ -19,14 +19,10 @@ slint::include_modules!();
 fn main() -> Result<(), Box<dyn Error>> {
     let app = AppWindow::new()?;
     let mut state = State::default();
-    if state.volume == 0.0 {
-    	state.volume = 50.0;
-    }
 
     ui::handle_initialization(&mut state);
     ui::handle_passing_values(&app, &mut state);
     ui::handle_events(&app, &mut Rc::new(RefCell::new(state)));
-
     app.run()?;
 
     Ok(())
@@ -125,24 +121,8 @@ impl State {
     }
 
     fn set_new_playlist(&mut self, globals: &SlintState) {
-        let playlists: Vec<SlintPlaylist> = self.convert_playlist_to_slint();
+        let playlists: Vec<SlintPlaylist> = self.convert_playlist();
         globals.set_playlist(ModelRc::from(&playlists[..]));
-    }
-
-    fn add_to_queue(&mut self, track_id: i32, i_know: bool) -> bool {
-    	if i_know {
-	    	if let Some(track) = self.index
-	     		.iter()
-	       		.find(|t| t.borrow().id == track_id)
-	     	{
-	        	self.queue.push(QueueItem { track_id: track.borrow().id });
-	         	println!("Queue {:?}", self.queue.len());
-	     	}
-
-			return true;
-     	}
-
-     	false
     }
 
     fn index_playing_reset(&mut self) {
@@ -152,6 +132,25 @@ impl State {
        			track.playing = false;
        		}
      	}
+    }
+
+    fn add_to_queue(&mut self, track_id: i32, i_know: bool, globals: &SlintState) -> bool {
+    	if i_know {
+	    	if let Some(track) = self.index
+	     		.iter()
+	       		.find(|t| t.borrow().id == track_id)
+	     	{
+	        	self.queue.push(QueueItem { track_id: track.borrow().id });
+	         	println!("Queue {:?}", self.queue);
+	     	}
+
+			let queue: Vec<SlintTrack> = self.convert_queue();
+            globals.set_queue(ModelRc::from(&queue[..]));
+
+			return true;
+     	}
+
+     	false
     }
 
     fn add_to_playlist(&mut self, playlist_id: i32, media_id: i32, globals: &SlintState) {
@@ -179,7 +178,7 @@ impl State {
                 }
             }
 
-            let playlists: Vec<SlintPlaylist> = self.convert_playlist_to_slint();
+            let playlists: Vec<SlintPlaylist> = self.convert_playlist();
             globals.set_playlist(ModelRc::from(&playlists[..]));
         };
     }
@@ -241,9 +240,7 @@ impl State {
     }
 
 	pub fn convert_track(&self) -> Option<slint_generatedAppWindow::SlintTrack> {
-		println!("LKASJDKLAS :: {:?}", self.queue.first());
 		if let Some(item) = self.queue.first() {
-			println!("LKASJDKLAS 2 :: {:?}", self.find_source_by_id(item.track_id));
 	  		if let Some((_, t)) = self.find_source_by_id(item.track_id) {
           		return Some(slint_generatedAppWindow::SlintTrack {
                     id: t.borrow().id,
@@ -263,7 +260,7 @@ impl State {
      	None
 	}
 
-    pub fn convert_playlist_to_slint(&self) -> Vec<slint_generatedAppWindow::SlintPlaylist> {
+    pub fn convert_playlist(&self) -> Vec<slint_generatedAppWindow::SlintPlaylist> {
         self.playlists
             .clone()
             .into_iter()

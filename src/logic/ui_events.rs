@@ -1,6 +1,7 @@
 use super::{audio::media_player::MediaPlayer, source};
 use crate::logic::data_types::playlist::Playlist;
 use crate::logic::data_types::queue_item::QueueItem;
+use crate::logic::data_types::setting::Setting;
 use crate::logic::data_types::source::Source;
 use crate::logic::data_types::track::Track;
 use crate::logic::database;
@@ -30,18 +31,47 @@ pub fn handle_initialization(state: &mut State) {
             println!("Fetched most recent playlists: {:?}", list);
             state.playlists = list;
         }
+
+        let settings = Vec::from([
+       		Setting {
+        		name: "volume".to_string(),
+          		value: "-1".to_string(),
+            	default_value: "20".to_string(),
+            	updated_at: "".to_string(),
+             	created_at: "".to_string(),
+        	}
+        ]);
+        if database::add_records(settings).is_ok() {
+      		println!("Settings set");
+       	}
     } else {
-        println!("Couldn't create db connection for initialization")
+        println!("Couldn't create db connection for initialization");
     }
 
     // Update, incase something changed during initialization
     if let Ok(read_sources) = validate_sources() {
         println!("Checked files {:?}", &read_sources);
-        database::add_records(read_sources);
+        let _ = database::add_records(read_sources);
         println!("Updated file sources");
         if let Ok(list) = database::get_table::<Track>() {
             println!("Files: {:?}", list);
             state.index = list.into_iter().map(|t| Rc::new(RefCell::new(t))).collect();
+        }
+        if let Ok(lists) = database::get_table::<Playlist>() {
+        	state.playlists = lists;
+        }
+        if let Ok(settings) = database::get_table::<Setting>() {
+        	if let Some(volume) = settings.iter().find(|s| s.name == "volume") {
+         		if let Some(numeric) = Setting::is_numeric(&volume.value) {
+	         		if numeric != -1 {
+	        			state.volume = numeric as f32;
+	           		} else {
+						if let Some(numeric) = Setting::is_numeric(&volume.default_value) {
+	             			state.volume = numeric as f32;
+						}
+	             	}
+	         	}
+           	}
         }
     }
 }
@@ -50,6 +80,8 @@ pub fn handle_passing_values(app: &AppWindow, state: &mut State) {
     let global_state = app.global::<SlintState>();
     state.set_index(Some(state.index.clone()), &global_state);
     state.set_queue(Some(state.queue.clone()), &global_state);
+    state.set_new_playlist(&global_state);
+    state.set_settings(&global_state);
     state.set_volume(&global_state);
 }
 
@@ -363,7 +395,7 @@ pub mod audio_control_events {
         let difference = previous_index.saturating_sub(current_index);
         if difference == 1 || difference == usize::MIN {
             if let Ok(Some(track)) = media_player.borrow_mut().next() {
-            	handle_media_start(media_player.clone(), track);
+            	let _ = handle_media_start(media_player.clone(), track);
             }
         }
         // Else the queue needs to be remade within the media player, if the queue is loopable.

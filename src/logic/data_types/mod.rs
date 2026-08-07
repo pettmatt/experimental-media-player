@@ -1,5 +1,6 @@
 pub mod playlist;
 pub mod queue_item;
+pub mod setting;
 pub mod source;
 pub mod track;
 
