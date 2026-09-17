@@ -11,6 +11,20 @@ export struct SlintTrack {
 	playing: bool,
 }
 
+export struct Album {
+	image: string,
+	title: string,
+	year: int,
+	tracks: [SlintTrack],
+}
+
+export struct SlintCollection {
+	image: string,
+	title: string,
+	artist: string,
+	albums: [Album],
+}
+
 export struct SlintQueueItem {
 	media_id: int,
 }
@@ -29,6 +43,8 @@ export struct SlintSettings {
 export struct SlintPlaylist {
 	id: int,
 	name: string,
+	artist: string,
+	list_type: string,
 	image_url: string,
 	created_at: string,
 	listened_at: string,

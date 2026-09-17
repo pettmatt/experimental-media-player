@@ -4,92 +4,153 @@ import { VolumeSlider } from "components/volume-slider.slint";
 import { CurrentlyPlaying } from "components/currently-playing.slint";
 
 export component MediaControllers {
-	in property<SlintTimeline> playing;
-	property<bool> dragging;
+    in property <SlintTimeline> playing;
+    property <bool> dragging;
+    in-out property <float> volume: SlintState.volume;
+    // property <bool> hovering: hover_zone.has-hover;
 
-	in-out property<float> volume: SlintState.volume;
-	property <bool> hovering: hover_zone.has-hover;
 
-	Timer {
-		property<int> count: 0;
-		interval: 1000ms;
-		running: SlintState.timeline.length > 0 ? true : false;
-		triggered() => {
-			if !dragging && playing.current != playing.length {
-				MediaActions.media_get_track_position();
+    Timer {
+        property <int> count: 0;
+        interval: 1000ms;
+        running: SlintState.timeline.length > 0 ? true : false;
+        triggered() => {
+            if !dragging && playing.current != playing.length {
+                MediaActions.media_get_track_position();
+            }
+        }
+    }
+
+    VerticalBox {
+    	horizontal-stretch: 1;
+     	alignment: center;
+        CurrentlyPlaying {
+        	horizontal-stretch: 1;
+            height: SlintState.current_track.playing ? 10px : 0px;
+            track: SlintState.current_track;
+            animate height, opacity { duration: 150ms; }
+        }
+
+        HorizontalBox {
+            horizontal-stretch: 1;
+            x: 0;
+
+            HorizontalBox {
+                alignment: start;
+                spacing: 5px;
+                width: 200px;
+
+                HorizontalBox {
+	                Button {
+	                    text: @tr("prev");
+	                    clicked => { MediaActions.media_change(-1) }
+	                }
+
+	                Button {
+	                    text: @tr("start");
+	                    clicked => { MediaActions.media_toggle() }
+	                }
+
+	                Button {
+	                    text: @tr("next");
+	                    clicked => { MediaActions.media_change(1) }
+	                }
+                }
+            }
+
+            HorizontalBox {
+            	horizontal-stretch: 1;
+	            Text {
+	                text: playing.str_current;
+	                horizontal-alignment: left;
+					width: 30px;
+	            }
+
+	            Slider {
+	                horizontal-stretch: 1;
+	                // width: 300px;
+					value: playing.current;
+	                minimum: 0.0;
+	                maximum: playing.length;
+	                changed(_) => {
+	                    dragging = true;
+	                    MediaActions.media_pause();
+	                }
+	                released(position) => {
+	                    dragging = false;
+	                    MediaActions.media_change_track_position(position);
+	                    MediaActions.media_toggle();
+	                }
+	            }
+
+	            Text {
+	                text: playing.str_length;
+	                horizontal-alignment: right;
+					width: 30px;
+	            }
+            }
+
+            HorizontalBox {
+	            alignment: end;
+	            spacing: 5px;
+            	width: 200px;
+
+	            HorizontalBox {
+		            Button {
+		                text: @tr("mix");
+		                clicked => { MediaActions.media_mix() }
+		            }
+
+		            Button {
+		                text: @tr("loop");
+		                clicked => { MediaActions.media_loop() }
+		            }
+	            }
+
+	            volume_slider := Slider {
+					// orientation: Orientation.vertical;
+	      			// width: hovering ? 100px : 0px;
+	                // opacity: hovering ? 1.0 : 0.0;
+	                width: 100px;
+	                value <=> root.volume;
+	                step: 0.1;
+	                animate width, opacity { duration: 150ms; }
+	                changed(value) => {
+	                    MediaActions.media_change_volume(value)
+	                }
+	            }
 			}
-		}
-	}
 
-	VerticalBox {
-		HorizontalBox {
-			alignment: center;
-			spacing: 5px;
+    //         hover_zone := TouchArea {
+    //             width: 124px;
+    //             height: 24px;
+				// // Image {
+				// // 	width: 24px;
+				// // 	height: 24px;
+				// // 	source: @image-url("volume-icon.svg");
+				// // }
+				// HorizontalLayout {
+    //                 spacing: 8px;
 
-			Button { text: @tr("mix"); clicked => { MediaActions.media_mix() } }
-			Button { text: @tr("prev"); clicked => { MediaActions.media_change(-1) } }
-			Button { text: @tr("start"); clicked => { MediaActions.media_toggle() } }
-			Button { text: @tr("next"); clicked => { MediaActions.media_change(1) } }
-			Button { text: @tr("loop"); clicked => { MediaActions.media_loop() } }
-			hover_zone := TouchArea {
-				width: 124px;
-				height: 24px;
-				// Image {
-				// 	width: 24px;
-				// 	height: 24px;
-				// 	source: @image-url("volume-icon.svg");
-				// }
-				HorizontalLayout {
-					spacing: 8px;
+    //                 Rectangle {
+    //                     width: 32px;
+    //                     height: 32px;
+    //                     background: Colors.red;
+    //                 }
 
-					Rectangle {
-						width: 32px;
-						height: 32px;
-						background: Colors.pink;
-					}
-
-					volume_slider := Slider {
-						// orientation: Orientation.vertical;
-		      			width: hovering ? 100px : 0px;
-		                opacity: hovering ? 1.0 : 0.0;
-		                value <=> root.volume;
-						step: 0.1;
-		                animate width, opacity { duration: 150ms; }
-						changed(value) => {
-							MediaActions.media_change_volume(value)
-						}
-					}
-				}
-			}
-		}
-
-		CurrentlyPlaying {
-			height: SlintState.current_track.playing ? 10px : 0px;
-			track: SlintState.current_track;
-			animate height, opacity { duration: 150ms; }
-		}
-
-		VerticalBox {
-			Slider {
-				width: 90%;
-				height: 10px;
-				value: playing.current;
-				minimum: 0.0;
-				maximum: playing.length;
-				changed(_) => {
-					dragging = true;
-					MediaActions.media_pause();
-				}
-				released(position) => {
-					dragging = false;
-					MediaActions.media_change_track_position(position);
-					MediaActions.media_toggle();
-				}
-			}
-			HorizontalBox {
-				Text { text: playing.str_current; horizontal-alignment: left; }
-				Text { text: playing.str_length; horizontal-alignment: right; }
-			}
-		}
-	}
+    //                 volume_slider := Slider {
+				// 		// orientation: Orientation.vertical;
+				// 		width: hovering ? 100px : 0px;
+    //                     opacity: hovering ? 1.0 : 0.0;
+    //                     value <=> root.volume;
+    //                     step: 0.1;
+    //                     animate width, opacity { duration: 150ms; }
+    //                     changed(value) => {
+    //                         MediaActions.media_change_volume(value)
+    //                     }
+    //                 }
+    //             }
+    //         }
+        }
+    }
 }

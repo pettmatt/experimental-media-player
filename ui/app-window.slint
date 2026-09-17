@@ -1,59 +1,270 @@
+import {
+    SlintState,
+    SettingActions,
+    MediaActions,
+    ContextMenuActions,
+} from "data-flow.slint";
 import { Button, VerticalBox, HorizontalBox } from "std-widgets.slint";
 import { Queue } from "queue.slint";
 import { SideBar } from "side-bar.slint";
-import { MainList } from "main-list.slint";
+import { MainList } from "./screens/main-list.slint";
 import { MediaControllers } from "media-controllers.slint";
-import { SlintState, SettingActions, MediaActions, ContextMenuActions } from "data-flow.slint";
 import { MobileQueue } from "mobile-queue.slint";
 import { DisplayBox } from "components/display-box.slint";
-
 export { SlintState, SettingActions, MediaActions, ContextMenuActions }
 
+component Container inherits Rectangle {
+    in property <string> label: "Container";
+
+    background: pink;
+    border-width: 1px;
+    border-color: black;
+    border-radius: 4px;
+    min-height: 80px;
+
+    VerticalLayout {
+        alignment: center;
+        padding: 8px;
+        spacing: 4px;
+
+        Text {
+            text: "";
+            horizontal-alignment: center;
+            font-weight: 700;
+        }
+    }
+}
+
 export component AppWindow inherits Window {
-	property<physical-length> gl-margin: 5px;
-	property<physical-length> gl-padding: 5px;
+	// width: 900px;
+	// height: 500px;
+	min-width: 400px;
+    title: "EMPlayer";
 
-    main-view := HorizontalBox {
-		x: 0px;
-		y: 25px;
+    property <length> sidebar-width: 200px;
+    property <length> queue-width: 200px;
+    property <length> breakpoint: 600px;
+    property <bool> is-small: root.width < breakpoint;
+
+    controllers := Container {
+        y: parent.height - self.height;
 		width: 100%;
-		height: root.height - (root.width < 700px ? 223px : 173px);
-
-		if root.width > 500px: DisplayBox {
-			SideBar { y: 0; list: SlintState.playlist; }
-		}
-
-		MainList {
-			min-width: parent.width * 0.6;
-			horizontal-stretch: 1;
-			list: SlintState.index;
-		}
-
-		if root.width > 700px: DisplayBox {
-			Queue { y: 0; queue: SlintState.queue; }
-		}
-	}
-
-	vertical-view := VerticalBox {
-		x: 0px;
-		y: parent.height - self.height;
-		height: root.width < 700px ? 200px : 150px;
-		width: 100%;
-
-		Button {
-			text: @tr("test");
-			clicked => { SettingActions.new_local_source() }
-		}
-
-		if root.width < 500px:
-			SideBar {}
-
-		if root.width < 700px: MobileQueue {
-			queue: SlintState.queue;
-		}
+        height: 80px;
 
 		MediaControllers {
 			playing: SlintState.timeline;
 		}
-	}
+    }
+
+    // Wide layout
+	if !is-small: HorizontalLayout {
+        spacing: 0px; // 12px
+		// vertical-stretch: 90;
+
+		sidebar := Container {
+            height: parent.height - controllers.height - 10px;
+			// horizontal-stretch: 15;
+			width: root.sidebar-width;
+
+			SideBar {
+				y: parent.y + 30px;
+				width: parent.width - 10px;
+				height: parent.height - 55px;
+                list: SlintState.playlist;
+            }
+        }
+
+        Rectangle {
+            width: 10px;
+            height: parent.height - controllers.height - 10px;
+            background: sidebar-handle.pressed ? #6688cc : transparent;
+
+            sidebar-handle := TouchArea {
+                mouse-cursor: ew-resize;
+                property <length> press-abs-x: 0px;
+                property <length> press-width: 0px;
+
+                pointer-event(event) => {
+                    if (event.kind == PointerEventKind.down) {
+                        self.press-abs-x = self.absolute-position.x + self.mouse-x;
+                        self.press-width = root.sidebar-width;
+                    }
+                }
+
+                moved => {
+                    if (self.pressed) {
+                        root.sidebar-width += (self.absolute-position.x + self.mouse-x) - self.press-abs-x;
+                    }
+                }
+            }
+        }
+
+        main_container := Container {
+            height: parent.height - controllers.height - 10px;
+            horizontal-stretch: 1;
+
+            MainList {
+				y: parent.y + 30px;
+				width: parent.width - 10px;
+				height: parent.height - 55px;
+				list: SlintState.index;
+            }
+        }
+
+        Rectangle {
+            width: 10px;
+            height: parent.height - controllers.height - 10px;
+            background: queue-handle.pressed ? #6688cc : transparent;
+
+            queue-handle := TouchArea {
+                mouse-cursor: ew-resize;
+
+                property <length> press-abs-x: 0px;
+                property <length> press-width: 0px;
+
+                pointer-event(event) => {
+                    if (event.kind == PointerEventKind.down) {
+                        self.press-abs-x = self.absolute-position.x + self.mouse-x;
+                        self.press-width = root.queue-width;
+                    }
+                }
+
+                moved => {
+                    if (self.pressed) {
+                        root.queue-width += (self.absolute-position.x + self.mouse-x) - self.press-abs-x;
+                    }
+                }
+            }
+        }
+
+        queue := Container {
+            height: parent.height - controllers.height - 10px;
+            width: root.queue-width;
+			// horizontal-stretch: 15;
+
+			Queue {
+				y: parent.y + 30px;
+				width: parent.width - 10px;
+				height: parent.height - 55px;
+				queue: SlintState.queue;
+				// min-width: parent.width * 0.1;
+				// horizontal-stretch: 1;
+			}
+        }
+    }
+
+    // Layout after the breakpoint
+	if is-small: VerticalLayout {
+        spacing: 12px;
+		// vertical-stretch: 90;
+
+		main_elements := HorizontalLayout {
+            spacing: 12px;
+            Container {
+                horizontal-stretch: 30;
+                vertical-stretch: 80;
+
+                SideBar {
+   					y: parent.y + 30px;
+					width: parent.width - 10px;
+					height: parent.height - 55px;
+                 	list: SlintState.playlist;
+                }
+            }
+
+            Container {
+                horizontal-stretch: 70;
+                vertical-stretch: 80;
+
+                MainList {
+					// min-width: parent.width * 0.6;
+					// horizontal-stretch: 1;
+					width: parent.width;
+					height: parent.height;
+					list: SlintState.index;
+                }
+            }
+        }
+
+        Container {
+            horizontal-stretch: 1;
+			// vertical-stretch: 10;
+
+			Queue {
+				y: parent.y + 30px;
+				width: parent.width - 10px;
+				height: parent.height - 55px;
+				queue: SlintState.queue;
+				// min-width: parent.width * 0.1;
+				// horizontal-stretch: 1;
+			}
+        }
+    }
+
+    // property<physical-length> gl-margin: 5px;
+	// property<physical-length> gl-padding: 5px;
+
+ //    main-view := HorizontalBox {
+	// 	x: 0px;
+	// 	y: 25px;
+	// 	width: 100%;
+	// 	height: root.height - (root.width < 700px ? 223px : 173px);
+
+	// 	if root.width > 500px:
+	// 		DisplayBox {
+	// 			SideBar { y: 0; list: SlintState.playlist; }
+	// 		}
+
+	// 	TextInput {
+	// 		text: "Enter your search";
+	// 		width: max(parent.width, self.preferred-width);
+	// 		vertical-alignment: center;
+	// 		private property<length> margin: 1rem;
+	// 		// cursor-position-changed(cursor-position) => {
+	// 		// 	if cursor-position.x + self.x < margin {
+	// 		// 		self.x = - cursor-position.x + margin;
+	// 		// 	} else if cursor-position.x + self.x > parent.width - margin - self.text-cursor-width {
+	// 		// 		self.x = parent.width - cursor-position.x - margin - self.text-cursor-width;
+	// 		// 	}
+	// 		// }
+	// 	}
+
+	// 	MainList {
+	// 		min-width: parent.width * 0.6;
+	// 		horizontal-stretch: 1;
+	// 		list: SlintState.index;
+	// 	}
+
+	// 	if root.width > 700px && SlintState.queue.length > 0:
+	// 		Queue {
+	// 			y: 0;
+	// 			queue: SlintState.queue;
+	// 			min-width: parent.width * 0.1;
+	// 			horizontal-stretch: 1;
+	// 		}
+	// }
+
+	// vertical-view := VerticalBox {
+	// 	x: 0px;
+	// 	y: parent.height - self.height;
+	// 	height: root.width < 700px ? 200px : 150px;
+	// 	width: 100%;
+
+	// 	Button {
+	// 		text: @tr("test");
+	// 		clicked => { SettingActions.new_local_source() }
+	// 	}
+
+	// 	if root.width < 500px:
+	// 		SideBar {}
+
+	// 	if root.width < 700px:
+	// 		MobileQueue {
+	// 			queue: SlintState.queue;
+	// 		}
+
+	// 	MediaControllers {
+	// 		playing: SlintState.timeline;
+	// 	}
+	// }
 }

@@ -4,6 +4,9 @@ export component CurrentlyPlaying {
 	in property<SlintTrack> track;
 
 	if track.playing: Text {
+		font-size: 14px;
+		horizontal-alignment: center;
+		width: 100%;
 		text: track.title + " - " + track.artist;
 	}
 }

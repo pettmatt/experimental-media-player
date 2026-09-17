@@ -1,0 +1,26 @@
+import { SlintTrack, MediaActions } from "../data-flow.slint";
+import { Palette } from "../style.slint";
+
+export component TrackContextMenu {
+	in property<SlintTrack> track;
+
+	ContextMenuArea {
+	    Menu {
+	        MenuItem {
+	            title: @tr("Add to queue");
+	            activated => {
+					debug("Add to queue");
+					MediaActions.add_to_queue(track.id);
+				}
+	        }
+	        Menu {
+	            title: @tr("Add to playlist");
+				// TODO: Dynamically add playlists to context menu. For loop below is not supported.
+				// for playlist in playlists: MenuItem {
+	                // title: playlist.name;
+					// activated() => { debug("Add to a specific playlist"); }
+	            // }
+	        }
+	    }
+	}
+}

@@ -1,0 +1,55 @@
+import { HorizontalBox, Button, ListView, VerticalBox, StandardTableView, ScrollView } from "std-widgets.slint";
+import { SlintTrack, SlintQueueItem, MediaActions, SlintPlaylist, MainView } from "../data-flow.slint";
+import { Palette } from "../style.slint";
+import { TrackContextMenu } from "../components/track-context-menu.slint";
+
+export component MainList {
+	in property<[SlintTrack]> list;
+	in property<[SlintPlaylist]> playlists;
+	property<MainView> main-view-id: MainView.index;
+
+	ScrollView {
+		height: parent.height + 50px;
+		VerticalLayout {
+			spacing: 5px;
+			alignment: start;
+
+			for media in list: TouchArea {
+				clicked => {
+					MediaActions.add_to_queue(media.id);
+					MediaActions.media_start(media.id);
+				}
+
+				Rectangle {
+					// height: 30px;
+					background: Palette.secondary-background;
+
+					HorizontalBox {
+						alignment: start;
+						spacing: 25px;
+
+						VerticalBox {
+							Text { text: media.title; }
+							Text {
+								font-size: 10px;
+								text: media.artist;
+							}
+						}
+
+						Text { text: media.playing ? "Playing" : ""; }
+						// Button {
+						// 	text: "Play";
+						// 	clicked => {
+						// 		ma.media_start(item.id);
+						// 	}
+						// }
+					}
+				}
+
+				TrackContextMenu {
+					track: media;
+				}
+			}
+		}
+	}
+}
