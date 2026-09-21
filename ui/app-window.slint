@@ -17,13 +17,12 @@ component Container inherits Rectangle {
     in property <string> label: "Container";
 
     background: pink;
-    border-width: 1px;
     border-color: black;
     border-radius: 4px;
+    border-width: 1px;
     min-height: 80px;
 
     VerticalLayout {
-        alignment: center;
         padding: 8px;
         spacing: 4px;
 
@@ -36,8 +35,8 @@ component Container inherits Rectangle {
 }
 
 export component AppWindow inherits Window {
-	// width: 900px;
-	// height: 500px;
+	preferred-width: 900px;
+	preferred-height: 1000px;
 	min-width: 400px;
     title: "EMPlayer";
 
@@ -45,16 +44,6 @@ export component AppWindow inherits Window {
     property <length> queue-width: 200px;
     property <length> breakpoint: 600px;
     property <bool> is-small: root.width < breakpoint;
-
-    controllers := Container {
-        y: parent.height - self.height;
-		width: 100%;
-        height: 80px;
-
-		MediaControllers {
-			playing: SlintState.timeline;
-		}
-    }
 
     // Wide layout
 	if !is-small: HorizontalLayout {
@@ -67,9 +56,8 @@ export component AppWindow inherits Window {
 			width: root.sidebar-width;
 
 			SideBar {
-				y: parent.y + 30px;
 				width: parent.width - 10px;
-				height: parent.height - 55px;
+				height: parent.height;
                 list: SlintState.playlist;
             }
         }
@@ -139,11 +127,10 @@ export component AppWindow inherits Window {
 
         queue := Container {
             height: parent.height - controllers.height - 10px;
-            width: root.queue-width;
+            width: SlintState.queue.length > 0 ? root.queue-width : 0;
 			// horizontal-stretch: 15;
 
 			Queue {
-				y: parent.y + 30px;
 				width: parent.width - 10px;
 				height: parent.height - 55px;
 				queue: SlintState.queue;
@@ -155,17 +142,15 @@ export component AppWindow inherits Window {
 
     // Layout after the breakpoint
 	if is-small: VerticalLayout {
-        spacing: 12px;
+        // spacing: 12px;
 		// vertical-stretch: 90;
 
 		main_elements := HorizontalLayout {
-            spacing: 12px;
             Container {
                 horizontal-stretch: 30;
                 vertical-stretch: 80;
 
                 SideBar {
-   					y: parent.y + 30px;
 					width: parent.width - 10px;
 					height: parent.height - 55px;
                  	list: SlintState.playlist;
@@ -191,7 +176,6 @@ export component AppWindow inherits Window {
 			// vertical-stretch: 10;
 
 			Queue {
-				y: parent.y + 30px;
 				width: parent.width - 10px;
 				height: parent.height - 55px;
 				queue: SlintState.queue;
@@ -201,70 +185,15 @@ export component AppWindow inherits Window {
         }
     }
 
-    // property<physical-length> gl-margin: 5px;
-	// property<physical-length> gl-padding: 5px;
+    controllers := Container {
+        y: parent.height - self.height;
+        height: 80px;
+        width: 100%;
 
- //    main-view := HorizontalBox {
-	// 	x: 0px;
-	// 	y: 25px;
-	// 	width: 100%;
-	// 	height: root.height - (root.width < 700px ? 223px : 173px);
-
-	// 	if root.width > 500px:
-	// 		DisplayBox {
-	// 			SideBar { y: 0; list: SlintState.playlist; }
-	// 		}
-
-	// 	TextInput {
-	// 		text: "Enter your search";
-	// 		width: max(parent.width, self.preferred-width);
-	// 		vertical-alignment: center;
-	// 		private property<length> margin: 1rem;
-	// 		// cursor-position-changed(cursor-position) => {
-	// 		// 	if cursor-position.x + self.x < margin {
-	// 		// 		self.x = - cursor-position.x + margin;
-	// 		// 	} else if cursor-position.x + self.x > parent.width - margin - self.text-cursor-width {
-	// 		// 		self.x = parent.width - cursor-position.x - margin - self.text-cursor-width;
-	// 		// 	}
-	// 		// }
-	// 	}
-
-	// 	MainList {
-	// 		min-width: parent.width * 0.6;
-	// 		horizontal-stretch: 1;
-	// 		list: SlintState.index;
-	// 	}
-
-	// 	if root.width > 700px && SlintState.queue.length > 0:
-	// 		Queue {
-	// 			y: 0;
-	// 			queue: SlintState.queue;
-	// 			min-width: parent.width * 0.1;
-	// 			horizontal-stretch: 1;
-	// 		}
-	// }
-
-	// vertical-view := VerticalBox {
-	// 	x: 0px;
-	// 	y: parent.height - self.height;
-	// 	height: root.width < 700px ? 200px : 150px;
-	// 	width: 100%;
-
-	// 	Button {
-	// 		text: @tr("test");
-	// 		clicked => { SettingActions.new_local_source() }
-	// 	}
-
-	// 	if root.width < 500px:
-	// 		SideBar {}
-
-	// 	if root.width < 700px:
-	// 		MobileQueue {
-	// 			queue: SlintState.queue;
-	// 		}
-
-	// 	MediaControllers {
-	// 		playing: SlintState.timeline;
-	// 	}
-	// }
+		MediaControllers {
+			height: 100%;
+			width: 100%;
+			playing: SlintState.timeline;
+		}
+    }
 }

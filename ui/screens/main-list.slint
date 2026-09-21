@@ -2,6 +2,7 @@ import { HorizontalBox, Button, ListView, VerticalBox, StandardTableView, Scroll
 import { SlintTrack, SlintQueueItem, MediaActions, SlintPlaylist, MainView } from "../data-flow.slint";
 import { Palette } from "../style.slint";
 import { TrackContextMenu } from "../components/track-context-menu.slint";
+import { Filler } from "../custom-elements/filler.slint";
 
 export component MainList {
 	in property<[SlintTrack]> list;
@@ -24,8 +25,7 @@ export component MainList {
 					// height: 30px;
 					background: Palette.secondary-background;
 
-					HorizontalBox {
-						alignment: start;
+					HorizontalLayout {
 						spacing: 25px;
 
 						VerticalBox {
@@ -35,14 +35,23 @@ export component MainList {
 								text: media.artist;
 							}
 						}
+						Filler {}
+						HorizontalBox {
+							width: 60px;
+							vertical-stretch: 1;
+							alignment: center;
+							spacing: 5px;
 
-						Text { text: media.playing ? "Playing" : ""; }
-						// Button {
-						// 	text: "Play";
-						// 	clicked => {
-						// 		ma.media_start(item.id);
-						// 	}
-						// }
+							Text {
+								font-size: 10px;
+								vertical-alignment: center;
+								text: media.duration;
+							}
+							Text {
+								vertical-alignment: center;
+								text: media.playing ? "Playing" : "";
+							}
+						}
 					}
 				}
 

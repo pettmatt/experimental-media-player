@@ -1,5 +1,5 @@
-import { ListView, HorizontalBox } from "std-widgets.slint";
-import { MediaActions as ma, SlintTrack, SlintState } from "data-flow.slint";
+import { ListView, HorizontalBox, ScrollView, VerticalBox } from "std-widgets.slint";
+import { MediaActions, SlintTrack, SlintState } from "data-flow.slint";
 import { Palette } from "style.slint";
 
 export component Queue {
@@ -8,23 +8,14 @@ export component Queue {
 
 	in property<[SlintTrack]> queue;
 
-	Text { text: @tr("Queue"); }
+	ScrollView {
+		VerticalLayout {
+			padding: 5px;
+			alignment: start;
 
-	for item in queue: Text {
-		text: item.id;
-	}
-
-	ListView {
-		height: parent.height;
-
-		for item in queue: Rectangle {
-			background: pink;
-			// height: 30px;
-
-			Text { text: @tr("test text"); }
-			TouchArea {
+			for item in queue: TouchArea {
 				clicked => {
-					ma.media_start(item.id);
+					MediaActions.media_start(item.id);
 				}
 
 				Rectangle {
@@ -33,11 +24,29 @@ export component Queue {
 
 					HorizontalBox {
 						alignment: start;
+						// spacing: 25px;
 
-						Text { text: item.id; }
-						Text { text: item.title; }
+						Text {
+							horizontal-alignment: left;
+							text: item.title + " - " + item.artist;
+						}
+						Text {
+							horizontal-alignment: right;
+							text: item.duration;
+						}
 					}
 				}
+
+				ContextMenuArea {
+			        Menu {
+			            MenuItem {
+			                title: @tr("Remove from queue");
+			                activated => {
+								debug("TODO: Remove logic from queue");
+							}
+			            }
+			        }
+			    }
 			}
 		}
 	}

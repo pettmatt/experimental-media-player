@@ -4,9 +4,9 @@ import { VolumeSlider } from "components/volume-slider.slint";
 import { CurrentlyPlaying } from "components/currently-playing.slint";
 
 export component MediaControllers {
+    in-out property <float> volume: SlintState.volume;
     in property <SlintTimeline> playing;
     property <bool> dragging;
-    in-out property <float> volume: SlintState.volume;
     // property <bool> hovering: hover_zone.has-hover;
 
 
@@ -22,36 +22,34 @@ export component MediaControllers {
     }
 
     VerticalBox {
-    	horizontal-stretch: 1;
-     	alignment: center;
+    	padding-top: 20px;
+     	spacing: 0;
+
         CurrentlyPlaying {
-        	horizontal-stretch: 1;
-            height: SlintState.current_track.playing ? 10px : 0px;
             track: SlintState.current_track;
-            animate height, opacity { duration: 150ms; }
+        	horizontal-stretch: 1;
         }
 
         HorizontalBox {
-            horizontal-stretch: 1;
-            x: 0;
-
             HorizontalBox {
-                alignment: start;
                 spacing: 5px;
-                width: 200px;
+                width: 230px;
 
                 HorizontalBox {
 	                Button {
+						width: 50px;
 	                    text: @tr("prev");
 	                    clicked => { MediaActions.media_change(-1) }
 	                }
 
 	                Button {
+						width: 50px;
 	                    text: @tr("start");
 	                    clicked => { MediaActions.media_toggle() }
 	                }
 
 	                Button {
+						width: 50px;
 	                    text: @tr("next");
 	                    clicked => { MediaActions.media_change(1) }
 	                }
@@ -60,9 +58,11 @@ export component MediaControllers {
 
             HorizontalBox {
             	horizontal-stretch: 1;
+
 	            Text {
 	                text: playing.str_current;
 	                horizontal-alignment: left;
+					vertical-alignment: center;
 					width: 30px;
 	            }
 
@@ -86,22 +86,24 @@ export component MediaControllers {
 	            Text {
 	                text: playing.str_length;
 	                horizontal-alignment: right;
+					vertical-alignment: center;
 					width: 30px;
 	            }
             }
 
             HorizontalBox {
-	            alignment: end;
 	            spacing: 5px;
             	width: 200px;
 
 	            HorizontalBox {
 		            Button {
+						width: 50px;
 		                text: @tr("mix");
 		                clicked => { MediaActions.media_mix() }
 		            }
 
 		            Button {
+						width: 50px;
 		                text: @tr("loop");
 		                clicked => { MediaActions.media_loop() }
 		            }
@@ -111,7 +113,7 @@ export component MediaControllers {
 					// orientation: Orientation.vertical;
 	      			// width: hovering ? 100px : 0px;
 	                // opacity: hovering ? 1.0 : 0.0;
-	                width: 100px;
+	                width: 80px;
 	                value <=> root.volume;
 	                step: 0.1;
 	                animate width, opacity { duration: 150ms; }

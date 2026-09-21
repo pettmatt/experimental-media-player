@@ -1,54 +1,88 @@
-import { HorizontalBox, VerticalBox } from "std-widgets.slint";
+import { HorizontalBox, VerticalBox, ScrollView } from "std-widgets.slint";
 import { SlintPlaylist, ContextMenuActions } from "data-flow.slint";
+import { Palette } from "style.slint";
+import { CustomButton } from "custom-elements/custom-button.slint";
 
-component Playlist {
+component Section {
+	in property<string> title;
+
+	VerticalLayout {
+		spacing: 5px;
+
+		Text {
+			text: title;
+		}
+
+		@children
+	}
+}
+
+component Playlist inherits Rectangle {
+	in property<SlintPlaylist> playlist;
+
 	accessible-role: none;
 	accessible-expandable: true;
+	height: 100%;
 
-	in property <SlintPlaylist> data;
+	background: Palette.secondary-background;
+	border-color: Palette.primary-background;
+	border-radius: 4px;
+	border-width: 2px;
 
-	HorizontalBox {
+	VerticalLayout {
+		alignment: start;
+		spacing: 5px;
+		padding: 5px;
+		width: parent.width - 10px;
+
+		// Dunno if playlists should have images... prob not.
 		// Image {
 			// height: 100%;
 			// source: @image-url(data.image_url);
 		// }
 
-		VerticalBox {
-			Text {
-				text: data.name;
-			}
-
-			Text {
-				text: @tr("Source: {}", data.sources.length > 1
-					? @tr("mixed ({})", data.sources.length)
-					: data.sources[0].path
-				);
-			}
+		Text {
+			text: playlist.name;
 		}
 	}
 }
 
 export component SideBar {
-	in property <[SlintPlaylist]> list;
+	accessible-role: none;
+	accessible-expandable: true;
 
-	VerticalBox {
-		Text {
-			text: "Placeholder";
+	in property<[SlintPlaylist]> list;
 
-			// Context menu needs to be a child of clickable element
-			ContextMenuArea {
-		        Menu {
-		            MenuItem {
-		                title: @tr("Create a new playlist");
-		                activated => { ContextMenuActions.create_new_playlist(); }
-		            }
-		        }
-		    }
-		}
+	ScrollView {
+		VerticalLayout {
+			// spacing: 5px;
+			alignment: start;
+			vertical-stretch: 1;
 
-		for data in list: Playlist {
-			data: data;
-			height: 30px;
+			Section {
+				title: "Playlist";
+
+				for playlist in list: TouchArea {
+					clicked => {
+						debug("Add 'switch view' functionality");
+					}
+
+					Playlist {
+						playlist: playlist;
+					}
+				}
+
+				TouchArea {
+					ContextMenuArea {
+				        Menu {
+				            MenuItem {
+				                title: @tr("Create a new playlist");
+				                activated => { ContextMenuActions.create_new_playlist(); }
+				            }
+				        }
+					}
+				}
+			}
 		}
 	}
 }

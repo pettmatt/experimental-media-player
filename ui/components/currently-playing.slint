@@ -6,7 +6,9 @@ export component CurrentlyPlaying {
 	if track.playing: Text {
 		font-size: 14px;
 		horizontal-alignment: center;
+		height: track.playing ? 20px : 0px;
 		width: 100%;
 		text: track.title + " - " + track.artist;
+		animate height, opacity { duration: 150ms; }
 	}
 }
