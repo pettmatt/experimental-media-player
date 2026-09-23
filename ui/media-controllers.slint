@@ -2,6 +2,7 @@ import { HorizontalBox, VerticalBox, Button, Slider } from "std-widgets.slint";
 import { MediaActions, SlintState, SlintTimeline } from "data-flow.slint";
 import { VolumeSlider } from "components/volume-slider.slint";
 import { CurrentlyPlaying } from "components/currently-playing.slint";
+import { IconButton } from "custom-elements/custom-button.slint";
 
 export component MediaControllers {
     in-out property <float> volume: SlintState.volume;
@@ -36,20 +37,17 @@ export component MediaControllers {
                 width: 230px;
 
                 HorizontalBox {
-	                Button {
-						width: 50px;
+	                IconButton {
 	                    text: @tr("prev");
 	                    clicked => { MediaActions.media_change(-1) }
 	                }
 
-	                Button {
-						width: 50px;
-	                    text: @tr("start");
+	                IconButton {
+	                    text: SlintState.current_track.playing ? "" : ""; //  
 	                    clicked => { MediaActions.media_toggle() }
 	                }
 
-	                Button {
-						width: 50px;
+	                IconButton {
 	                    text: @tr("next");
 	                    clicked => { MediaActions.media_change(1) }
 	                }
@@ -68,7 +66,6 @@ export component MediaControllers {
 
 	            Slider {
 	                horizontal-stretch: 1;
-	                // width: 300px;
 					value: playing.current;
 	                minimum: 0.0;
 	                maximum: playing.length;
@@ -96,31 +93,39 @@ export component MediaControllers {
             	width: 200px;
 
 	            HorizontalBox {
-		            Button {
-						width: 50px;
-		                text: @tr("mix");
+		            IconButton {
+		                text: "";
 		                clicked => { MediaActions.media_mix() }
 		            }
 
-		            Button {
-						width: 50px;
-		                text: @tr("loop");
+		            IconButton {
+		                text: "";
 		                clicked => { MediaActions.media_loop() }
 		            }
 	            }
 
-	            volume_slider := Slider {
-					// orientation: Orientation.vertical;
-	      			// width: hovering ? 100px : 0px;
-	                // opacity: hovering ? 1.0 : 0.0;
-	                width: 80px;
-	                value <=> root.volume;
-	                step: 0.1;
-	                animate width, opacity { duration: 150ms; }
-	                changed(value) => {
-	                    MediaActions.media_change_volume(value)
-	                }
-	            }
+				HorizontalBox {
+					IconButton {
+						text: volume > 75
+							? "" : volume > 35
+								? "" : volume == 0
+									? "" : "";
+						clicked => { debug("Implement: Mute/unmute") }
+					}
+
+		            volume_slider := Slider {
+						// orientation: Orientation.vertical;
+		      			// width: hovering ? 100px : 0px;
+		                // opacity: hovering ? 1.0 : 0.0;
+		                width: 80px;
+		                value <=> root.volume;
+		                step: 0.1;
+		                animate width, opacity { duration: 150ms; }
+		                changed(value) => {
+		                    MediaActions.media_change_volume(value)
+		                }
+		            }
+				}
 			}
 
     //         hover_zone := TouchArea {

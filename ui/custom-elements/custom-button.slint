@@ -1,5 +1,18 @@
-export component CustomButton {
-	accessible-role: button;
+export component IconButton inherits Rectangle {
+    in property <string> text;
+    callback clicked <=> touch.clicked;
 
-	@children
+    background: touch.pressed ? #00000022 : (touch.has-hover ? #00000011 : transparent);
+    border-radius: 20px;
+    height: 30px;
+    width: 30px;
+
+    Text {
+        text: root.text;
+    	font-size: 18px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    touch := TouchArea {}
 }
