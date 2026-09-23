@@ -8,6 +8,7 @@ export struct SlintTrack {
 	extension: string,
 	file_size: int,
 	duration: int,
+	str_duration: string,
 	playing: bool,
 }
 
@@ -56,6 +57,14 @@ export struct SlintPlaylist {
 		id: int,
 		added_at: string,
 	}],
+}
+
+export struct SlintSearchResultItem {
+	name: string,
+	artist: string,
+	length: int,
+	tags: [string],
+	date: string,
 }
 
 export global SlintState {

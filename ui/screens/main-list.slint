@@ -11,6 +11,7 @@ export component MainList {
 
 	ScrollView {
 		height: parent.height + 50px;
+
 		VerticalLayout {
 			spacing: 5px;
 			alignment: start;
@@ -22,7 +23,6 @@ export component MainList {
 				}
 
 				Rectangle {
-					// height: 30px;
 					background: Palette.secondary-background;
 
 					HorizontalLayout {
@@ -45,7 +45,7 @@ export component MainList {
 							Text {
 								font-size: 10px;
 								vertical-alignment: center;
-								text: media.duration;
+								text: media.str_duration;
 							}
 							Text {
 								vertical-alignment: center;

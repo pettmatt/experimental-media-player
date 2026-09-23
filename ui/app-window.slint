@@ -11,6 +11,7 @@ import { MainList } from "./screens/main-list.slint";
 import { MediaControllers } from "media-controllers.slint";
 import { MobileQueue } from "mobile-queue.slint";
 import { DisplayBox } from "components/display-box.slint";
+import { Search } from "components/search.slint";
 export { SlintState, SettingActions, MediaActions, ContextMenuActions }
 
 component Container inherits Rectangle {
@@ -91,10 +92,11 @@ export component AppWindow inherits Window {
             height: parent.height - controllers.height - 10px;
             horizontal-stretch: 1;
 
+            search := Search {}
             MainList {
-				y: parent.y + 30px;
+				y: search.y + 65px;
 				width: parent.width - 10px;
-				height: parent.height - 55px;
+				height: parent.height - 90px;
 				list: SlintState.index;
             }
         }

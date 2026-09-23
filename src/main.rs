@@ -55,22 +55,9 @@ impl TimeLine {
 	    slint_generatedAppWindow::SlintTimeline {
 			current: self.current,
 			length: self.length,
-	        str_current: SharedString::from(self.format_into_time(self.current as f64)),
-	        str_length: SharedString::from(self.format_into_time(self.length as f64)),
+	        str_current: SharedString::from(format_into_time(self.current as f64)),
+	        str_length: SharedString::from(format_into_time(self.length as f64)),
 	    }
-    }
-
-    fn format_into_time(&self, seconds: f64) -> String {
-    	let total = seconds.max(0.0).round() as u64;
-     	let hours = total / 3600;
-      	let minutes = (total % 3600) / 60;
-       	let secs = total % 60;
-
-        if hours > 0 {
-        	format!("{:02}:{:02}:{:02}", hours, minutes, secs)
-        } else {
-            format!("{}:{:02}", minutes, secs)
-        }
     }
 }
 
@@ -120,7 +107,7 @@ impl State {
     	}
     }
 
-    fn set_new_playlist(&mut self, globals: &SlintState) {
+    fn set_playlist(&mut self, globals: &SlintState) {
         let playlists: Vec<SlintPlaylist> = self.convert_playlist();
         globals.set_playlist(ModelRc::from(&playlists[..]));
     }
@@ -196,6 +183,7 @@ impl State {
                 year: t.borrow().year as i32,
                 extension: t.borrow().extension.clone().into(),
                 duration: t.borrow().duration,
+                str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
                 file_size: t.borrow().file_size,
                 playing: t.borrow().playing,
             })
@@ -219,6 +207,7 @@ impl State {
                         extension: t.borrow().extension.clone().into(),
                         file_size: t.borrow().file_size,
                         duration: t.borrow().duration,
+                        str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
                         playing: t.borrow().playing,
                     };
                 }
@@ -233,6 +222,7 @@ impl State {
                     extension: SharedString::from(""),
                     file_size: 0,
                     duration: 0,
+                    str_duration: SharedString::from(""),
                     playing: false,
                 }
             })
@@ -252,6 +242,7 @@ impl State {
                     extension: t.borrow().extension.clone().into(),
                     file_size: t.borrow().file_size,
                     duration: t.borrow().duration,
+                    str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
                     playing: t.borrow().playing,
                 });
 	    	}
@@ -267,6 +258,7 @@ impl State {
             .map(|p| {
                 let mut sources = Vec::new();
                 let mut tracks = Vec::new();
+                let mut artist = String::from("");
 
                 if let Some(s) = p.sources {
                     sources = s;
@@ -276,9 +268,15 @@ impl State {
                     tracks = t;
                 }
 
+                if let Some(a) = p.artist {
+                	artist = a
+                }
+
                 slint_generatedAppWindow::SlintPlaylist {
                     id: p.id,
                     name: SharedString::from(p.name),
+                    artist: SharedString::from(artist),
+                    list_type: SharedString::from(p.list_type),
                     image_url: SharedString::from(p.image_url),
                     created_at: SharedString::from(p.created_at),
                     listened_at: SharedString::from(p.listened_at),
@@ -324,5 +322,18 @@ impl State {
         }
 
         None
+    }
+}
+
+fn format_into_time(seconds: f64) -> String {
+	let total = seconds.max(0.0).round() as u64;
+ 	let hours = total / 3600;
+  	let minutes = (total % 3600) / 60;
+   	let secs = total % 60;
+
+    if hours > 0 {
+    	format!("{:02}:{:02}:{:02}", hours, minutes, secs)
+    } else {
+        format!("{}:{:02}", minutes, secs)
     }
 }

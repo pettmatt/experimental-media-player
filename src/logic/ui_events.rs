@@ -80,8 +80,7 @@ pub fn handle_passing_values(app: &AppWindow, state: &mut State) {
     let global_state = app.global::<SlintState>();
     state.set_index(Some(state.index.clone()), &global_state);
     state.set_queue(Some(state.queue.clone()), &global_state);
-    state.set_new_playlist(&global_state);
-    state.set_settings(&global_state);
+    state.set_playlist(&global_state);
     state.set_volume(&global_state);
 }
 
@@ -343,7 +342,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
                 state_clone.borrow_mut().playlists.push(new_entry);
                 if let Some(app) = app_clone.upgrade() {
                     let global_state = app.global::<SlintState>();
-                    state_clone.borrow_mut().set_new_playlist(&global_state);
+                    state_clone.borrow_mut().set_playlist(&global_state);
                 }
             };
         }

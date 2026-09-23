@@ -12,6 +12,7 @@ pub struct Track {
     pub year: u32,
     pub extension: String,
     pub duration: i32,
+    pub str_duration: String,
     pub file_size: i32,
     pub playing: bool,
 }
@@ -46,6 +47,7 @@ impl Instanceable for Track {
             extension: "".to_string(),
             file_size: 0,
             duration: 0,
+            str_duration: 0.to_string(),
             playing: false,
         }
     }
@@ -55,6 +57,7 @@ impl FromRow for Track {
     fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
     	let year = row.get("year").unwrap_or_else(|_| 0);
      	let genre = row.get("genre").unwrap_or_else(|_| "".to_string());
+      	let str_duration = row.get("duration").unwrap_or_else(|_| "".to_string());
 
         let file = Self {
             id: row.get("id")?,
@@ -66,6 +69,7 @@ impl FromRow for Track {
             extension: row.get("extension")?,
             file_size: row.get("file_size")?,
             duration: row.get("duration")?,
+            str_duration: str_duration,
             playing: row.get("playing")?,
         };
 

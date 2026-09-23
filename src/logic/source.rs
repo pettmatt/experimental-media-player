@@ -1,4 +1,4 @@
-use crate::logic::{data_types::{playlist::Playlist, source::Source, track::Track}, database};
+use crate::logic::{data_types::{playlist::{AudioEntry, Playlist}, source::Source, track::Track}, database};
 use super::{
     custom::ErrorHandler,
 };
@@ -20,6 +20,7 @@ pub fn new_local_source() -> Option<PathBuf> {
 
 pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
     let mut list: Vec<Track> = Vec::new();
+    let mut playlist_paths: Vec<(String, String, PathBuf)> = Vec::new();
     let path = source.as_path();
 
     let entries = fs::read_dir(path).expect("Couldn't read directory from path");
@@ -70,6 +71,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
 	            	artist = tag.artist().unwrap_or(default.clone()).to_string();
 	             	title = tag.title().unwrap_or(default.clone()).to_string();
 	              	genre = tag.genre().unwrap_or(default.clone()).to_string();
+					println!("tag.album {:?}", tag.album());
 
 	              	if let Some(album_name) = tag.album() {
 	               		let playlists = database::get_table::<Playlist>();
@@ -92,6 +94,12 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
 	                   			if let Err(()) = database::add_record::<Playlist>(album) {
 	                   				println!("Failed to create new album \"{album_name}\".");
 	                      		}
+
+								// if file_extension.contains("m3u") {
+								// 	playlist_paths.push(
+								// 		(album_name.to_string(), artist.to_string(), entry_path.clone())
+								// 	);
+								// }
 	                     	}
 	                  	}
 	                 	// Todo: Create new album playlist if album is found
@@ -114,11 +122,38 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
                     path,
                     file_size,
                     duration: d.as_secs_f32() as i32,
+                    str_duration: "".to_string(),
                     playing: false,
                 });
             }
         }
     }
+   //  panic!("KLASJDLKSAD {:?}", playlist_paths);
+   //  if !&playlist_paths.is_empty() {
+   //  	for (album_name, artist, path) in playlist_paths {
+			// if let Ok(track_titles) = read_m3u_file(&path) {
+			// 	let tracks: Vec<Track> = list.iter().filter(|t| {
+			// 		track_titles.iter().any(|track| t.path.contains(track))
+			// 	}).cloned().collect();
+			// 	panic!("KALJSDLKASJ {:?}", tracks);
+			// 	let album = Playlist {
+		 // 			id: 0,
+			//   		name: album_name.clone(),
+			//        	list_type: "album".to_string(),
+			//        	artist: Some(artist),
+			//        	image_url: "".to_string(),
+			//        	created_at: "".to_string(),
+			//         listened_at: "".to_string(),
+			//        	sources: None,
+			//         tracks: None
+			//     };
+
+			// 	if let Err(()) = database::add_record::<Playlist>(album) {
+			// 		println!("Failed to create new album \"{album_name}\".");
+			// 	}
+			// }
+   //   	}
+   //  }
 
     Ok(list)
 }
@@ -137,7 +172,7 @@ pub fn validate_sources(source_list: Vec<Source>) -> Result<Vec<Track>, ErrorHan
         } else {
             // Later on we can add logic to validate other than local sources.
             // At that point probably better to switch if-statement to match.
-            println!("Not a local source: {:?}", source);
+            panic!("Not a local source: {:?}", source); // Temp panic, to make sure I remember to change this.
         }
     }
 
@@ -156,4 +191,14 @@ fn get_duration(path: &Path) -> Option<core::time::Duration> {
 fn read_audio_file<P: AsRef<Path>>(path: P) -> Result<lofty::file::TaggedFile, Box<dyn std::error::Error>> {
     let tag = Probe::open(&path)?.read()?;
     Ok(tag)
+}
+
+fn read_m3u_file<P: AsRef<Path>>(m3u_path: P) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+	let file = std::fs::read_to_string(m3u_path).unwrap();
+	let paths: Vec<&str> = file
+		.lines()
+		.filter(|line| !line.starts_with("#") && !line.trim().is_empty())
+		.collect();
+	let result = paths.iter().map(|s| s.to_string()).collect();
+	Ok(result)
 }
