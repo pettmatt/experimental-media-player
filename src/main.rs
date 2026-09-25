@@ -71,9 +71,11 @@ pub struct State {
     // 	sources: Vec<String>,
     // 	settings: Settings,
     volume: f32,
+    search_result: Vec<Track>,
 }
 
 impl State {
+	// Mainly used to set the index when starting the program.
     pub fn set_index(&mut self, index: Option<Vec<Rc<RefCell<Track>>>>, globals: &SlintState) {
         if let Some(i) = index {
             self.index = i;
@@ -82,6 +84,11 @@ impl State {
         let index: Vec<SlintTrack> = self.convert_index();
         globals.set_index(ModelRc::from(&index[..]));
     }
+
+    // Controls how tracks are added to the system.
+    // For example when searching tracks potentially from online, we potentially need to add
+    // tracks on the fly to the index and/or a playlist without disturbing the user.
+    pub fn add_to_index() {}
 
     pub fn set_queue(&mut self, queue: Option<Vec<QueueItem>>, globals: &SlintState) {
         if let Some(q) = queue {
