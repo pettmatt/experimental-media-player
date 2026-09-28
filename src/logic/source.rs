@@ -61,7 +61,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             let mut artist = "unknown".to_string();
             let mut title = "".to_string();
             let mut genre = "".to_string();
-            let mut year = 0;
+            let mut year = "".to_string();
 
             // BUG: Unknown format creates issues
             let file_tag_result = read_audio_file(&path);
@@ -106,7 +106,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
 	               	}
 
 	               	if let Some(y) = tag.year() {
-	                	year = y;
+	                	year = y.to_string();
 	                }
              	}
             }
@@ -123,6 +123,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
                     file_size,
                     duration: d.as_secs_f32() as i32,
                     str_duration: "".to_string(),
+                    thumbnail: "".to_string(),
                     playing: false,
                 });
             }

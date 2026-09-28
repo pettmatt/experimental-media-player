@@ -1,6 +1,7 @@
 use crate::logic::data_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
+use requests::api::yt::{MusicVideo};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Track {
@@ -9,12 +10,37 @@ pub struct Track {
     pub artist: String,
     pub path: String,
     pub genre: String,
-    pub year: u32,
+    pub year: String,
     pub extension: String,
     pub duration: i32,
     pub str_duration: String,
+    pub thumbnail: String,
     pub file_size: i32,
     pub playing: bool,
+}
+
+impl From<MusicVideo> for Track {
+	fn from(v: MusicVideo) -> Self {
+		let mut thumbnail = "".to_string();
+		if let Some(url) = v.thumbnail_url {
+			thumbnail = url
+		}
+
+		Track {
+			id: 0,
+			title: v.title,
+			artist: v.channel_title,
+			path: format!("https://www.youtube.com/watch?v={}", v.video_id),
+			genre: "".to_string(),
+			year: v.published_at,
+			extension: "online".to_string(),
+			duration: 0, // Should be updated when the video is fetched
+			str_duration: "".to_string(),
+			thumbnail: thumbnail,
+			file_size: 0,
+			playing: false,
+		}
+	}
 }
 
 impl std::fmt::Display for Track {
@@ -43,11 +69,12 @@ impl Instanceable for Track {
             artist: "".to_string(),
             path: "".to_string(),
             genre: "".to_string(),
-            year: 0,
+            year: "".to_string(),
             extension: "".to_string(),
             file_size: 0,
             duration: 0,
             str_duration: 0.to_string(),
+            thumbnail: "".to_string(),
             playing: false,
         }
     }
@@ -55,7 +82,7 @@ impl Instanceable for Track {
 
 impl FromRow for Track {
     fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
-    	let year = row.get("year").unwrap_or_else(|_| 0);
+    	let year = row.get("year").unwrap_or_else(|_| "".to_string());
      	let genre = row.get("genre").unwrap_or_else(|_| "".to_string());
       	let str_duration = row.get("duration").unwrap_or_else(|_| "".to_string());
 
@@ -70,6 +97,7 @@ impl FromRow for Track {
             file_size: row.get("file_size")?,
             duration: row.get("duration")?,
             str_duration: str_duration,
+            thumbnail: row.get("thumbnail")?,
             playing: row.get("playing")?,
         };
 

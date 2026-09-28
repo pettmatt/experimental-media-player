@@ -69,7 +69,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 				list_type	TEXT NOT NULL,
 				name		TEXT NOT NULL,
 				artist		TEXT,
-				image_url	TEXT,
+				thumbnail	TEXT,
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
 				listened_at	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
@@ -79,11 +79,12 @@ pub fn initialize_tables() -> Result<(), ()> {
 				artist	 	TEXT NOT NULL,
 				path 		TEXT NOT NULL UNIQUE,
 				genre		TEXT,
-				year		INTEGER,
+				year		TEXT,
 				extension 	TEXT NOT NULL,
 				file_size 	INTEGER,
 				duration	INTEGER,
-				playing		INTEGER NOT NULL,
+				thumbnail	TEXT,
+				playing		INTEGER NOT NULL DEFAULT FALSE,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
 			"CREATE TABLE IF NOT EXISTS playlist_tracks (
