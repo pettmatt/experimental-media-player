@@ -1,4 +1,4 @@
-use crate::logic::{data_types::{playlist::{AudioEntry, Playlist}, source::Source, track::Track}, database};
+use crate::logic::{data_types::{playlist::{Playlist}, source::Source, track::Track}, database};
 use super::{
     custom::ErrorHandler,
 };
@@ -77,6 +77,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
 	               		let playlists = database::get_table::<Playlist>();
 
 	                 	if let Ok(playlists) = playlists {
+							// TODO: Check that this statement doesn't mark all existing playlists as albums
 	                 		let album_exists: bool = playlists.iter().any(|pl| &pl.name == &album_name);
 	                   		if album_exists.not() {
 	                     		let album = Playlist {
@@ -84,7 +85,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
 	                          		name: album_name.to_string(),
 	                            	list_type: "album".to_string(),
 	                            	artist: Some(artist.clone()),
-	                              	image_url: "".to_string(),
+	                              	thumbnail: "".to_string(),
 	                               	created_at: "".to_string(),
 	                                listened_at: "".to_string(),
 	                             	sources: None,
@@ -142,7 +143,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
 			//   		name: album_name.clone(),
 			//        	list_type: "album".to_string(),
 			//        	artist: Some(artist),
-			//        	image_url: "".to_string(),
+			//        	thumbnail: "".to_string(),
 			//        	created_at: "".to_string(),
 			//         listened_at: "".to_string(),
 			//        	sources: None,

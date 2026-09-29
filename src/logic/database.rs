@@ -80,10 +80,10 @@ pub fn initialize_tables() -> Result<(), ()> {
 				path 		TEXT NOT NULL UNIQUE,
 				genre		TEXT,
 				year		TEXT,
+				thumbnail	TEXT,
 				extension 	TEXT NOT NULL,
 				file_size 	INTEGER,
 				duration	INTEGER,
-				thumbnail	TEXT,
 				playing		INTEGER NOT NULL DEFAULT FALSE,
 				created 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
@@ -173,6 +173,7 @@ pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>
 struct ErrorBody {
     is_error: bool,
     message: Result<usize, rusqlite::Error>,
+    record: String,
 }
 
 pub fn add_records<
@@ -187,6 +188,7 @@ pub fn add_records<
             let mut response = ErrorBody {
                 is_error: false,
                 message: Ok(0),
+                record: "".to_string(),
             };
 
             let ex_result = connection.execute(
@@ -197,12 +199,25 @@ pub fn add_records<
             if ex_result.is_err() {
                 response.is_error = true;
                 response.message = ex_result;
+                response.record = record.to_string();
             };
 
             result.insert(key, response);
         }
 
-        println!("Failure Hashmap: {:?}", result);
+        for (id, body) in &result {
+	        if body.is_error {
+				println!("Add record failure hashmap: {:?}", result);
+				match &body.message {
+					Err(e) => eprintln!("Error [id {id}] record \"{}\": {e}", body.record),
+	                Ok(code) => eprintln!(
+	                    "Error [id {id}] record \"{}\": marked as error but message was Ok({code})",
+	                    body.record
+	                ),
+				};
+	        }
+        }
+
         return Ok(());
     }
 

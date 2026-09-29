@@ -3,9 +3,6 @@ name = "requests"
 version = "0.1.0"
 edition = "2024"
 
-# [patch.crates-io]
-# lofty = "=0.24.0"
-
 [dependencies]
 async-stream = "0.3.6"
 base64 = "0.22.1"

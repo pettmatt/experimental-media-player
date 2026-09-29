@@ -15,7 +15,7 @@ pub struct Playlist {
 	pub name: String,
 	pub artist: Option<String>,
 	pub list_type: String,
-	pub image_url: String,
+	pub thumbnail: String,
 	pub created_at: String,
 	pub listened_at: String,
 	pub tracks: Option<Vec<AudioEntry>>,
@@ -25,7 +25,7 @@ pub struct Playlist {
 impl std::fmt::Display for Playlist {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(
-			f, "{}, {}, {}, {}, {:?}", self.name, self.image_url,
+			f, "{}, {}, {}, {}, {:?}", self.name, self.thumbnail,
 			self.created_at, self.listened_at, self.tracks
 		)
 	}
@@ -38,7 +38,7 @@ impl Instanceable for Playlist {
 			name: "".to_string(),
 			list_type: "".to_string(),
 			artist: None,
-			image_url: "".to_string(),
+			thumbnail: "".to_string(),
 			created_at: "".to_string(),
 			listened_at: "".to_string(),
 			tracks: None,
@@ -55,7 +55,7 @@ impl FromRow for Playlist {
 			list_type: row.get("list_type")?,
 			name: row.get("name")?,
 			artist: row.get("artist")?,
-			image_url: row.get("image_url")?,
+			thumbnail: row.get("thumbnail")?,
 			created_at: row.get("created_at")?,
 			listened_at: row.get("listened_at")?,
 			tracks: None,
@@ -80,7 +80,7 @@ impl GetQuery for Playlist {
 	fn get_query(&self, query: SqlQueries) -> String {
 		match query {
 			SqlQueries::Insert => String::from("
-				INSERT INTO playlists (name, list_type, image_url, artist)
+				INSERT INTO playlists (name, list_type, thumbnail, artist)
 				VALUES (?, ?, ?, ?);
 			"),
 			SqlQueries::Select => String::from("SELECT * FROM playlists;"),
@@ -89,7 +89,7 @@ impl GetQuery for Playlist {
 				SET
 					name = (name),
 					list = (list_type),
-					image_url = (image_url),
+					thumbnail = (thumbnail),
 					artist = (artist),
 				WHERE name = (name)
 				VALUES (?, ?, ?, ?);
@@ -107,7 +107,7 @@ impl ToSqlParams for Playlist {
 		vec![
 			&self.name as &dyn ToSql,
 			&self.list_type as &dyn ToSql,
-			&self.image_url as &dyn ToSql,
+			&self.thumbnail as &dyn ToSql,
 			&self.artist as &dyn ToSql
 		]
 	}

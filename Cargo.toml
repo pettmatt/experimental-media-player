@@ -32,6 +32,7 @@ slint = "1.12.1"
 symphonia = "0.5.5"
 symphonia-core = "0.6.0"
 thiserror = "2.0.16"
+requests = { path = "./requests/" }
 
 [build-dependencies]
 slint-build = "1.12.1"

@@ -45,9 +45,15 @@ impl From<MusicVideo> for Track {
 
 impl std::fmt::Display for Track {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    	let thumbnail = if self.thumbnail == "" {
+     		"no-thumbnail".to_string()
+     	} else {
+      		self.thumbnail.clone()
+      	};
+
         write!(
             f,
-            "{}, {}, {}, {:?}, {}, {}, {}, {}, {}",
+            "{}, {}, {}, {:?}, {}, {}, {}, {}, {}, {}",
             self.title,
             self.artist,
             self.path,
@@ -56,7 +62,8 @@ impl std::fmt::Display for Track {
             self.extension,
             self.duration,
             self.file_size,
-            self.playing
+            thumbnail,
+            self.playing,
         )
     }
 }
@@ -130,8 +137,8 @@ impl GetQuery for Track {
     fn get_query(&self, query: SqlQueries) -> String {
         match query {
             SqlQueries::Insert => String::from("
-				INSERT INTO tracks (title, artist, path, extension, file_size, duration, playing)
-				VALUES (?, ?, ?, ?, ?, ?, ?);
+				INSERT INTO tracks (title, artist, path, genre, year, thumbnail, extension, file_size, duration, playing)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 			"),
             SqlQueries::Select => String::from("SELECT * FROM tracks;"),
  			SqlQueries::Update => String::from("
@@ -140,12 +147,15 @@ impl GetQuery for Track {
 					title = (title),
 					artist = (artist),
 					path = (path),
+					genre = (genre),
+					year = (year),
+					thumbnail = (thumbnail),
 					extension = (extension),
 					file_size = (file_size),
 					duration = (duration),
 					playing = (playing),
 				WHERE id = (id)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
     		"),
 			SqlQueries::Delete => String::from("
 				DELETE FROM tracks WHERE id = (id)
@@ -161,6 +171,9 @@ impl ToSqlParams for Track {
             &self.title as &dyn ToSql,
             &self.artist as &dyn ToSql,
             &self.path as &dyn ToSql,
+            &self.genre as &dyn ToSql,
+            &self.year as &dyn ToSql,
+            &self.thumbnail as &dyn ToSql,
             &self.extension as &dyn ToSql,
             &self.file_size as &dyn ToSql,
             &self.duration as &dyn ToSql,

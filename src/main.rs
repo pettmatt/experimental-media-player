@@ -187,11 +187,12 @@ impl State {
                 title: t.borrow().title.clone().into(),
                 path: t.borrow().path.clone().into(),
                 genre: t.borrow().genre.clone().into(),
-                year: t.borrow().year as i32,
+                year: t.borrow().year.to_string().into(),
                 extension: t.borrow().extension.clone().into(),
                 duration: t.borrow().duration,
                 str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
                 file_size: t.borrow().file_size,
+                thumbnail: t.borrow().thumbnail.clone().into(),
                 playing: t.borrow().playing,
             })
             .collect()
@@ -210,11 +211,12 @@ impl State {
                         artist: t.borrow().artist.clone().into(),
                         path: t.borrow().path.clone().into(),
                         genre: t.borrow().genre.clone().into(),
-                        year: t.borrow().year as i32,
+                        year: t.borrow().year.to_string().into(),
                         extension: t.borrow().extension.clone().into(),
                         file_size: t.borrow().file_size,
                         duration: t.borrow().duration,
                         str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
+                        thumbnail: t.borrow().thumbnail.clone().into(),
                         playing: t.borrow().playing,
                     };
                 }
@@ -225,11 +227,12 @@ impl State {
                     artist: SharedString::from(""),
                     path: SharedString::from(""),
                     genre: SharedString::from(""),
-                    year: 0,
+                    year: SharedString::from(""),
                     extension: SharedString::from(""),
                     file_size: 0,
                     duration: 0,
                     str_duration: SharedString::from(""),
+                    thumbnail: SharedString::from(""),
                     playing: false,
                 }
             })
@@ -245,11 +248,12 @@ impl State {
                     artist: t.borrow().artist.clone().into(),
                     path: t.borrow().path.clone().into(),
                     genre: t.borrow().genre.clone().into(),
-                    year: t.borrow().year as i32,
+                    year: t.borrow().year.clone().into(),
                     extension: t.borrow().extension.clone().into(),
                     file_size: t.borrow().file_size,
                     duration: t.borrow().duration,
                     str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
+                    thumbnail: t.borrow().thumbnail.clone().into(),
                     playing: t.borrow().playing,
                 });
 	    	}
@@ -284,7 +288,7 @@ impl State {
                     name: SharedString::from(p.name),
                     artist: SharedString::from(artist),
                     list_type: SharedString::from(p.list_type),
-                    image_url: SharedString::from(p.image_url),
+                    thumbnail: SharedString::from(p.thumbnail),
                     created_at: SharedString::from(p.created_at),
                     listened_at: SharedString::from(p.listened_at),
                     sources: convert_to_slint_model(sources),
