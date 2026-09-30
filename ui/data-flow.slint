@@ -73,7 +73,7 @@ export global SlintState {
 	in property<[SlintTrack]> queue;
 	in property<[SlintPlaylist]> playlist;
 	in property<SlintTimeline> timeline;
-	in property<SlintSettings> settings;
+	// in property<SlintSettings> settings;
 	in property<SlintTrack> current_track;
 	in property<float> volume;
 	in property<[SlintTrack]> search_result;
@@ -100,8 +100,8 @@ export global MediaActions {
 }
 
 export global SearchActions {
-	callback search_local(string, [string]) -> [SlintTrack];
-	callback search_online(string, [string]) -> [SlintTrack];
+	callback search_local(string, [string]);
+	callback search_online(string, [string]);
 }
 
 export global ContextMenuActions {

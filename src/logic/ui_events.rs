@@ -7,8 +7,8 @@ use crate::logic::data_types::track::Track;
 use crate::logic::database;
 use crate::logic::queue::Queue;
 use crate::logic::validate_sources;
-use crate::{AppWindow, ContextMenuActions, MediaActions, SettingActions, SlintState, State};
-use slint::ComponentHandle;
+use crate::{AppWindow, ContextMenuActions, MediaActions, SearchActions, SettingActions, SlintState, State};
+use slint::{ComponentHandle};
 use std::{cell::RefCell, rc::Rc};
 
 // Todo: restructure the whole file and stream line it. Too messy to work with after a while.
@@ -84,10 +84,11 @@ pub fn handle_passing_values(app: &AppWindow, state: &mut State) {
     state.set_volume(&global_state);
 }
 
-pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
+pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runtime: &tokio::runtime::Runtime) {
     let player = Rc::new(RefCell::new(MediaPlayer::new(state.clone())));
     let global_media_actions = app.global::<MediaActions>();
     let global_setting_actions = app.global::<SettingActions>();
+    let global_search_actions = app.global::<SearchActions>();
     let global_context_menu_actions = app.global::<ContextMenuActions>();
     let weak_app = app.as_weak();
 
@@ -205,7 +206,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
     global_media_actions.on_media_change_track_position({
         let player_clone = Rc::clone(&player);
 
-        move |position| {
+        move |position: i32| {
             let duration_position = position as f64;
             player_clone.borrow_mut().try_seek(duration_position);
         }
@@ -312,6 +313,68 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
         }
     });
 
+	// TODO: make sure the search_term is valid (shouldn't be trusted)
+    global_search_actions.on_search_local({
+	    let state_clone = Rc::clone(state);
+		let app_clone = weak_app.clone();
+
+		// TODO: Extemely simple search result that probably is too slow for large indexes.
+		// TODO: Tags should a hash map.
+	    move |search_term: slint::SharedString, tags: slint::ModelRc<slint::SharedString>| {
+			let s_term = search_term.to_ascii_lowercase();
+			let tracks: Vec<Track> = state_clone.borrow().index
+				.iter()
+				.filter(|track| {
+					let t = track.borrow();
+					t.artist.to_ascii_lowercase().contains(&s_term) ||
+					t.title.to_ascii_lowercase().contains(&s_term)
+				})
+				.map(|track| track.borrow().clone())
+				.collect();
+
+			if let Some(app) = app_clone.upgrade() {
+				let global_state = app.global::<SlintState>();
+	        	state_clone.borrow_mut().set_search_result(tracks.clone(), &global_state);
+				println!("State search results changed: {:?}", state_clone.borrow().search_result);
+			}
+	    }
+    });
+
+//     global_search_actions.on_search_online({
+//     	use requests::Fetch;
+// 	    let state_clone = Rc::clone(state);
+// 		let tokio_handle = tokio_runtime.handle().clone();
+// 		let app_clone = weak_app.clone();
+//
+// 	    move |search_term: slint::SharedString, tags: slint::ModelRc<slint::SharedString>| {
+// 			let tokio_handle = tokio_handle.clone();
+// 			let mut tracks: Vec<Track> = Vec::new();
+//
+// 			slint::spawn_local(async move {
+// 				let result = tokio_handle.spawn(async move {
+// 					requests::search(
+// 						search_term.to_string().to_ascii_lowercase(),
+// 						tags.iter().map(|s| s.to_string()).collect(),
+// 						Fetch::Search
+// 					).await
+// 				})
+// 				.await
+// 				.unwrap();
+//
+// 				match result {
+// 					Ok(SearchResults::Videos(videos)) =>
+// 						tracks = videos.into_iter().map(Into::into).collect(),
+// 					Ok(_) =>
+// 						eprintln!("UI events :: enum logic not implemented to on_search_local()"),
+// 					Err(e) =>
+// 						eprintln!("Search failed: {e}")
+// 				};
+// 			});
+//
+//         	state_clone.borrow_mut().search_result = tracks;
+// 	    }
+//     });
+
     global_context_menu_actions.on_create_new_playlist({
         use crate::Playlist;
         let app_clone = weak_app.clone();
@@ -331,7 +394,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>) {
                 name,
                 artist: None,
                 list_type: "playlist".to_string(),
-                image_url: "".to_string(),
+                thumbnail: "".to_string(),
                 created_at: "".to_string(),
                 listened_at: "".to_string(),
                 sources: None,

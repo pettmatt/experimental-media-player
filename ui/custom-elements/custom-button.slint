@@ -1,5 +1,7 @@
 export component IconButton inherits Rectangle {
     in property <string> text;
+    in property <int> font-size: 18;
+    in property <TextHorizontalAlignment> h-alignment: center;
     callback clicked <=> touch.clicked;
 
     background: touch.pressed ? #00000022 : (touch.has-hover ? #00000011 : transparent);
@@ -8,11 +10,14 @@ export component IconButton inherits Rectangle {
     width: 30px;
 
     Text {
-        text: root.text;
-    	font-size: 18px;
-        horizontal-alignment: center;
+    	width: 100%;
+    	font-size: font-size * 1px;
+        horizontal-alignment: h-alignment;
         vertical-alignment: center;
+        text: root.text;
     }
 
-    touch := TouchArea {}
+    touch := TouchArea {
+    	width: 100%;
+    }
 }

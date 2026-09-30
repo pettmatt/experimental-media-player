@@ -33,10 +33,10 @@ impl From<MusicVideo> for Track {
 			path: format!("https://www.youtube.com/watch?v={}", v.video_id),
 			genre: "".to_string(),
 			year: v.published_at,
+			thumbnail: thumbnail,
 			extension: "online".to_string(),
 			duration: 0, // Should be updated when the video is fetched
 			str_duration: "".to_string(),
-			thumbnail: thumbnail,
 			file_size: 0,
 			playing: false,
 		}
@@ -59,10 +59,10 @@ impl std::fmt::Display for Track {
             self.path,
             self.genre,
             self.year,
+            thumbnail,
             self.extension,
             self.duration,
             self.file_size,
-            thumbnail,
             self.playing,
         )
     }
@@ -77,11 +77,11 @@ impl Instanceable for Track {
             path: "".to_string(),
             genre: "".to_string(),
             year: "".to_string(),
+            thumbnail: "".to_string(),
             extension: "".to_string(),
             file_size: 0,
             duration: 0,
             str_duration: 0.to_string(),
-            thumbnail: "".to_string(),
             playing: false,
         }
     }
@@ -100,11 +100,11 @@ impl FromRow for Track {
             path: row.get("path")?,
             genre: genre,
             year: year,
+            thumbnail: row.get("thumbnail")?,
             extension: row.get("extension")?,
             file_size: row.get("file_size")?,
             duration: row.get("duration")?,
             str_duration: str_duration,
-            thumbnail: row.get("thumbnail")?,
             playing: row.get("playing")?,
         };
 

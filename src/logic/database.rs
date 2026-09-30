@@ -205,9 +205,11 @@ pub fn add_records<
             result.insert(key, response);
         }
 
+		println!("Add record failure hashmap:");
+		let mut no_errors = true;
         for (id, body) in &result {
+        	no_errors = false;
 	        if body.is_error {
-				println!("Add record failure hashmap: {:?}", result);
 				match &body.message {
 					Err(e) => eprintln!("Error [id {id}] record \"{}\": {e}", body.record),
 	                Ok(code) => eprintln!(
@@ -216,6 +218,10 @@ pub fn add_records<
 	                ),
 				};
 	        }
+        }
+
+        if no_errors {
+        	println!("No errors.")
         }
 
         return Ok(());

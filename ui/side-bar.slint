@@ -37,7 +37,7 @@ component Playlist inherits Rectangle {
 		// Dunno if playlists should have images... prob not.
 		// Image {
 			// height: 100%;
-			// source: @image-url(data.image_url);
+			// source: @image-url(data.thumbnail);
 		// }
 
 		Text {
@@ -59,7 +59,7 @@ export component SideBar {
 			vertical-stretch: 1;
 
 			Section {
-				title: "Playlist";
+				title: "Playlists";
 
 				for playlist in list: TouchArea {
 					clicked => {

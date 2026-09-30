@@ -1,0 +1,108 @@
+import { SlintSearchResultItem, SearchActions, SlintTrack, SlintState, MediaActions } from "../data-flow.slint";
+import { IconButton } from "../custom-elements/custom-button.slint";
+import { ScrollView } from "std-widgets.slint";
+
+component SearchList inherits Rectangle {
+	in property <[SlintTrack]> search_result: [];
+	background: Colors.blue;
+	border-radius: 4px;
+	max-height: 15 * 14px;
+	min-height: 30px;
+	width: 100%;
+	height: (search_result.length + 1) * 14px;
+
+	ScrollView {
+		height: parent.height;
+
+		if SlintState.search_result.length > 0: VerticalLayout {
+			// cross-axis-alignment: start;
+			// alignment: start;
+			spacing: 20px;
+			// width: 100%;
+
+			for track in search_result: IconButton {
+				h-alignment: TextHorizontalAlignment.left;
+				horizontal-stretch: 1;
+				height: 15px;
+				font-size: 14;
+				text: track.artist + " - " + track.title;
+				clicked => {
+					debug("Implement view change")
+				}
+			}
+		} if SlintState.search_result.length == 0: VerticalLayout {
+			Text {
+				padding: 0.25rem;
+				text: "No tracks found";
+			}
+		}
+	}
+
+	Text {
+		y: parent.height - 14px - 6px; // p.height - font-size - padding
+		text: "Press enter to search from online";
+	}
+}
+
+export component Search inherits Rectangle {
+	property <[string]> tags: [];
+
+	Rectangle {
+		background: Colors.red;
+		border-radius: 20px;
+		padding: 1rem;
+		width: 100%;
+
+		HorizontalLayout {
+			spacing: 0.8rem;
+			padding-left: 0.8rem;
+			padding-top: 0.2rem;
+
+			Text {
+				vertical-alignment: center;
+				font-size: 1.6rem;
+				text: "";
+			}
+
+			for tag in tags: Rectangle {
+				padding: 5px;
+				border-radius: 4px;
+				background: Colors.black;
+
+				Text {
+					color: Colors.white;
+					text: tag;
+				}
+			}
+
+			VerticalLayout {
+				search_input := TextInput {
+					width: 100%;
+					font-size: 14px;
+					input-type: InputType.text;
+					vertical-alignment: center;
+					text: "";
+
+					edited => { SearchActions.search_local(self.text, tags) }
+					accepted => { SearchActions.search_online(self.text, tags) }
+
+					if !search_input.has-focus && search_input.text == "": Text {
+						width: 100%;
+						font-size: 14px;
+						text: "Search...";
+					}
+				}
+			}
+		}
+
+		if search_input.text != "": SearchList {
+			z: 100;
+			y: parent.height + 0.2rem;
+			x: 0 + 10px;
+			width: parent.width - 20px;
+			max-height: 300px;
+
+			search_result: SlintState.search_result;
+		}
+	}
+}

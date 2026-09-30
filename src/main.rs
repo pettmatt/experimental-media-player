@@ -10,7 +10,7 @@ use crate::logic::{
     slint::convert_to_slint_model,
 };
 use logic::ui_events as ui;
-use slint::{ComponentHandle, ModelRc, SharedString};
+use slint::{ComponentHandle, Model, ModelExt, ModelRc, SharedString};
 use std::{cell::RefCell, error::Error, rc::Rc};
 mod logic;
 
@@ -19,10 +19,11 @@ slint::include_modules!();
 fn main() -> Result<(), Box<dyn Error>> {
     let app = AppWindow::new()?;
     let mut state = State::default();
+    let tokio_runtime = tokio::runtime::Runtime::new()?;
 
     ui::handle_initialization(&mut state);
     ui::handle_passing_values(&app, &mut state);
-    ui::handle_events(&app, &mut Rc::new(RefCell::new(state)));
+    ui::handle_events(&app, &mut Rc::new(RefCell::new(state)), &tokio_runtime);
     app.run()?;
 
     Ok(())
@@ -64,7 +65,7 @@ impl TimeLine {
 #[derive(Clone, Debug, Default)]
 pub struct State {
     index: Vec<Rc<RefCell<Track>>>,
-    queue: Vec<QueueItem>, // Because Rodio doesn't offer frexible way to interact with the queue, we're managing by deleting the queue, whenever we want to make a change.
+    queue: Vec<QueueItem>,
     trash_queue: Vec<QueueItem>,
     timeline: TimeLine,
     playlists: Vec<Playlist>,
@@ -75,7 +76,22 @@ pub struct State {
 }
 
 impl State {
-	// Mainly used to set the index when starting the program.
+ 	pub fn set_state(&mut self, globals: &SlintState) {
+  		let current_track = self.index.iter().find(|track| {
+	  		track.borrow().playing
+	  	}).unwrap();
+
+    	globals.set_index(ModelRc::from(&self.convert_index()[..]));
+     	globals.set_queue(ModelRc::from(&self.convert_queue()[..]));
+      	globals.set_playlist(ModelRc::from(&self.convert_playlist()[..]));
+       	globals.set_timeline(self.convert_timeline());
+        // globals.set_settings(state.get_settings());
+        globals.set_current_track(self.convert_track(&current_track.borrow()));
+        globals.set_volume(self.volume.clone());
+        globals.set_search_result(ModelRc::from(&self.convert_search_tracks()[..]));
+    }
+
+	// Sets slint index by converting application's state to Slint format
     pub fn set_index(&mut self, index: Option<Vec<Rc<RefCell<Track>>>>, globals: &SlintState) {
         if let Some(i) = index {
             self.index = i;
@@ -108,7 +124,7 @@ impl State {
     }
 
     pub fn set_current_track(&mut self, globals: &SlintState) {
-  		if let Some(track) = self.convert_track() {
+  		if let Some(track) = self.convert_next_track() {
        		globals.set_current_track(track);
         	println!("globals {:?}", globals.get_current_track());
     	}
@@ -117,6 +133,19 @@ impl State {
     fn set_playlist(&mut self, globals: &SlintState) {
         let playlists: Vec<SlintPlaylist> = self.convert_playlist();
         globals.set_playlist(ModelRc::from(&playlists[..]));
+    }
+
+    fn set_search_result(&mut self, tracks: Vec<Track>, globals: &SlintState) {
+      	self.search_result = tracks;
+    	let converted_tracks: Vec<slint_generatedAppWindow::SlintTrack> =
+     		self.search_result.iter().map(|t| self.convert_track(t)).collect();
+     	let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(converted_tracks)));
+
+    	globals.set_search_result(model);
+
+    	for track in globals.get_search_result().iter() {
+   			println!("slint search result {:?}", track);
+    	}
     }
 
     fn index_playing_reset(&mut self) {
@@ -239,27 +268,72 @@ impl State {
             .collect()
     }
 
-	pub fn convert_track(&self) -> Option<slint_generatedAppWindow::SlintTrack> {
+    pub fn convert_next_track(&self) -> Option<slint_generatedAppWindow::SlintTrack> {
 		if let Some(item) = self.queue.first() {
 	  		if let Some((_, t)) = self.find_source_by_id(item.track_id) {
-          		return Some(slint_generatedAppWindow::SlintTrack {
-                    id: t.borrow().id,
-                    title: t.borrow().title.clone().into(),
-                    artist: t.borrow().artist.clone().into(),
-                    path: t.borrow().path.clone().into(),
-                    genre: t.borrow().genre.clone().into(),
-                    year: t.borrow().year.clone().into(),
-                    extension: t.borrow().extension.clone().into(),
-                    file_size: t.borrow().file_size,
-                    duration: t.borrow().duration,
-                    str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
-                    thumbnail: t.borrow().thumbnail.clone().into(),
-                    playing: t.borrow().playing,
-                });
+             		return Some(slint_generatedAppWindow::SlintTrack {
+                       id: t.borrow().id,
+                       title: t.borrow().title.clone().into(),
+                       artist: t.borrow().artist.clone().into(),
+                       path: t.borrow().path.clone().into(),
+                       genre: t.borrow().genre.clone().into(),
+                       year: t.borrow().year.clone().into(),
+                       thumbnail: t.borrow().thumbnail.clone().into(),
+                       extension: t.borrow().extension.clone().into(),
+                       file_size: t.borrow().file_size,
+                       duration: t.borrow().duration,
+                       str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
+                       playing: t.borrow().playing,
+                   });
 	    	}
 		}
 
-     	None
+        	None
+	}
+
+	pub fn convert_track(&self, track: &Track) -> slint_generatedAppWindow::SlintTrack {
+  		slint_generatedAppWindow::SlintTrack {
+            id: track.id,
+            title: track.title.clone().into(),
+            artist: track.artist.clone().into(),
+            path: track.path.clone().into(),
+            genre: track.genre.clone().into(),
+            year: track.year.clone().into(),
+            thumbnail: track.thumbnail.clone().into(),
+            extension: track.extension.clone().into(),
+            file_size: track.file_size,
+            duration: track.duration,
+            str_duration: SharedString::from(format_into_time(track.duration as f64)),
+            playing: track.playing,
+		}
+	}
+
+	pub fn convert_timeline(&self) -> slint_generatedAppWindow::SlintTimeline {
+		slint_generatedAppWindow::SlintTimeline {
+			current: self.timeline.current.clone(),
+			length: self.timeline.length.clone(),
+			str_current: self.timeline.current.to_string().into(),
+			str_length: self.timeline.length.to_string().into(),
+		}
+	}
+
+	pub fn convert_search_tracks(&self) -> Vec<slint_generatedAppWindow::SlintTrack> {
+		self.search_result.iter().map(|t| {
+			slint_generatedAppWindow::SlintTrack {
+				id: t.id,
+	            title: t.title.clone().into(),
+	            artist: t.artist.clone().into(),
+	            path: t.path.clone().into(),
+	            genre: t.genre.clone().into(),
+	            year: t.year.clone().into(),
+				thumbnail: t.thumbnail.clone().into(),
+	            extension: t.extension.clone().into(),
+	            file_size: t.file_size,
+	            duration: t.duration,
+	            str_duration: SharedString::from(format_into_time(t.duration as f64)),
+	            playing: t.playing,
+			}
+		}).collect()
 	}
 
     pub fn convert_playlist(&self) -> Vec<slint_generatedAppWindow::SlintPlaylist> {
