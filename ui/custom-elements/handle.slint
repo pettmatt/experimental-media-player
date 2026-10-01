@@ -1,0 +1,38 @@
+export component Handle inherits Rectangle {
+	in property <length> component-width;
+	out property <bool> hovered;
+	callback resized(length);
+
+ 	height: 100%;
+  	width: 4px;
+
+    handle-touch := TouchArea {
+        property <length> last-abs-x: 0px;
+        enabled: root.component-width > 0px;
+        mouse-cursor: ew-resize;
+
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                self.last-abs-x = self.absolute-position.x + self.mouse-x;
+            }
+        }
+
+        moved => {
+            if (self.pressed) {
+                let current = self.absolute-position.x + self.mouse-x;
+                root.resized(current - self.last-abs-x);
+                self.last-abs-x = current;
+            }
+        }
+
+        // hover := TouchArea {
+        // 	moved => {
+        //  		if hover.has-hover {
+        //    			hovered = true;
+        //    		} else {
+        //      		hovered = false;
+        //      	}
+        //  	}
+        // }
+    }
+}
