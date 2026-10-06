@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use rand::prelude::*;
 
 pub trait Queue {
-	fn add_to_queue(&mut self, media: &Rc<RefCell<Track>>);
+	fn add_to_queue(&mut self, track: &Rc<RefCell<Track>>);
 	fn remove_from_queue(&mut self, id: i32);
 	fn progress_queue(&mut self) -> Vec<QueueItem>;
 	fn update_playing_audio_in_queue(&mut self, index: i32) -> Option<(usize, usize)>;

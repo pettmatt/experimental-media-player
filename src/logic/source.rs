@@ -60,7 +60,8 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             let id = list.len() as i32;
             let mut artist = "unknown".to_string();
             let mut title = "".to_string();
-            let mut genre = "".to_string();
+            let mut genres = Vec::new();
+            let mut genres_str = "".to_string();
             let mut year = "".to_string();
 
             // BUG: Unknown format creates issues
@@ -68,9 +69,10 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             if let Ok(file_tag) = file_tag_result {
             	if let Some(tag) = file_tag.primary_tag() {
 	            	let default = Cow::Borrowed("???");
+					genres_str = tag.genre().unwrap_or(default.clone()).to_string();
 	            	artist = tag.artist().unwrap_or(default.clone()).to_string();
 	             	title = tag.title().unwrap_or(default.clone()).to_string();
-	              	genre = tag.genre().unwrap_or(default.clone()).to_string();
+	              	genres.push(genres_str.clone());
 					println!("tag.album {:?}", tag.album());
 
 	              	if let Some(album_name) = tag.album() {
@@ -117,7 +119,8 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
                     id,
                     artist,
                     title,
-                    genre,
+                    genres,
+                    genres_str,
                     year,
                     extension: file_extension.to_string(),
                     path,
@@ -130,7 +133,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             }
         }
     }
-   //  panic!("KLASJDLKSAD {:?}", playlist_paths);
+
    //  if !&playlist_paths.is_empty() {
    //  	for (album_name, artist, path) in playlist_paths {
 			// if let Ok(track_titles) = read_m3u_file(&path) {

@@ -64,6 +64,12 @@ pub fn initialize_tables() -> Result<(), ()> {
 				updated_at 	DATETIME DEFAULT (datetime('now', 'localtime')),
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
+			"CREATE TABLE IF NOT EXISTS artists (
+				name		TEXT NOT NULL PRIMARY KEY,
+				year		INTEGER,
+				thumbnail	TEXT,
+				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
+			);",
 		   	"CREATE TABLE IF NOT EXISTS playlists (
 				id			INTEGER PRIMARY KEY AUTOINCREMENT,
 				list_type	TEXT NOT NULL,
@@ -78,7 +84,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 				title 		TEXT NOT NULL,
 				artist	 	TEXT NOT NULL,
 				path 		TEXT NOT NULL UNIQUE,
-				genre		TEXT,
+				genres		TEXT,
 				year		TEXT,
 				thumbnail	TEXT,
 				extension 	TEXT NOT NULL,
@@ -89,18 +95,26 @@ pub fn initialize_tables() -> Result<(), ()> {
 			);",
 			"CREATE TABLE IF NOT EXISTS playlist_tracks (
 				playlist_id INTEGER NOT NULL,
-				track_id INTEGER NOT NULL,
+				track_id 	INTEGER NOT NULL,
 				PRIMARY KEY (playlist_id, track_id),
 				FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
 				FOREIGN KEY (track_id) REFERENCES tracks(id) ON DELETE CASCADE
 			);",
 			"CREATE TABLE IF NOT EXISTS playlist_sources (
 				playlist_id INTEGER NOT NULL,
-				source_id INTEGER NOT NULL,
+				source_id 	INTEGER NOT NULL,
 				PRIMARY KEY (playlist_id, source_id),
 				FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
 				FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE
 			);",
+			"CREATE TABLE IF NOT EXISTS playlist_artists (
+			    playlist_id INTEGER NOT NULL,
+			    artist_name TEXT NOT NULL,
+			    PRIMARY KEY (playlist_id, artist_name),
+			    FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
+			    FOREIGN KEY (artist_name) REFERENCES artists(name) ON DELETE CASCADE ON UPDATE CASCADE
+			);",
+			"CREATE INDEX IF NOT EXISTS idx_playlist_artists_artist ON playlist_artists(artist_name);"
         ];
 
         let mut index = 0;
