@@ -8,6 +8,7 @@ pub mod queue;
 pub mod source;
 pub mod ui_events;
 pub mod slint;
+pub mod convert;
 mod custom {
     use thiserror::Error;
 

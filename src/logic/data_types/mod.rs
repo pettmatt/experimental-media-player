@@ -1,7 +1,10 @@
+pub mod state;
 pub mod playlist;
 pub mod queue_item;
+pub mod timeline;
 pub mod setting;
 pub mod source;
+pub mod artist;
 pub mod track;
 
 use rusqlite::{Row, ToSql};
@@ -28,6 +31,10 @@ pub trait ToSqlParams {
 
 pub trait Convertable {
 	fn convert_to_string(&mut self);
+}
+
+pub trait SlintConvertable {
+	fn create_image_from_path(&self) -> slint::Image;
 }
 
 pub enum SqlQueries {
