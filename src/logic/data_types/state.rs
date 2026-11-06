@@ -1,4 +1,4 @@
-use crate::{SlintPlaylist, SlintState, SlintTrack, logic::{convert::{format_into_time, list_into_string, to_model_rc}, data_types::{SlintConvertable, artist::Artist, playlist::{AudioEntry, Playlist}, queue_item::QueueItem, timeline::Timeline, track::Track}, slint::convert_to_slint_model}, slint_generatedAppWindow};
+use crate::{SlintPlaylist, SlintState, SlintTrack, logic::{convert::{format_into_time, to_model_rc}, data_types::{SlintConvertable, ToSlint, artist::Artist, playlist::{AudioEntry, Playlist}, queue_item::QueueItem, timeline::Timeline, track::Track}}, slint_generatedAppWindow};
 use std::{cell::RefCell, rc::Rc};
 use slint::{ModelRc, SharedString, VecModel};
 
@@ -16,6 +16,7 @@ pub struct State {
     pub trash_queue: Vec<QueueItem>,
     pub timeline: Timeline,
     pub playlists: Vec<Playlist>,
+    pub artists: Vec<Artist>,
     // 	sources: Vec<String>,
     // 	settings: Settings,
     pub volume: f32,
@@ -28,12 +29,12 @@ impl State {
 	  		track.borrow().playing
 	  	}).unwrap();
 
-    	globals.set_index(ModelRc::from(&self.convert_index()[..]));
-     	globals.set_queue(ModelRc::from(&self.convert_queue()[..]));
+    	globals.set_index(ModelRc::from(&self.index_to_slint()[..]));
+     	globals.set_queue(ModelRc::from(&self.queue_to_slint()[..]));
       	globals.set_playlist(ModelRc::from(&self.convert_playlists()[..]));
-       	globals.set_timeline(self.convert_timeline());
+       	globals.set_timeline(self.timeline.to_slint(None));
         // globals.set_settings(state.get_settings());
-        globals.set_current_track(self.convert_track(&current_track.borrow()));
+        globals.set_current_track(current_track.borrow().to_slint(None));
         globals.set_volume(self.volume.clone());
     }
 
@@ -43,7 +44,7 @@ impl State {
             self.index = i;
         }
 
-        let index: Vec<SlintTrack> = self.convert_index();
+        let index: Vec<SlintTrack> = self.index_to_slint();
         globals.set_index(ModelRc::from(&index[..]));
     }
 
@@ -52,12 +53,16 @@ impl State {
     // tracks on the fly to the index and/or a playlist without disturbing the user.
     pub fn add_to_index() {}
 
+    pub fn set_main_view(&mut self, value: crate::SlintSelected, globals: &SlintState) {
+  		globals.set_selected_item(value);
+    }
+
     pub fn set_queue(&mut self, queue: Option<Vec<QueueItem>>, globals: &SlintState) {
         if let Some(q) = queue {
             self.queue = q;
         }
 
-        let media_queue = self.convert_queue();
+        let media_queue = self.queue_to_slint();
         println!(
             "(State) Queue state updated. {:?} ::: {:?}",
             self.queue, media_queue
@@ -86,13 +91,13 @@ impl State {
 
     	let converted_tracks: Vec<slint_generatedAppWindow::SlintTrack> =
      		self.search_result.tracks
-       			.iter().map(|t| self.convert_track(t)).collect();
+       			.iter().map(|t| t.to_slint(None)).collect();
      	let converted_artists: Vec<slint_generatedAppWindow::SlintArtist> =
       		self.search_result.artists
-        		.iter().map(|a| self.convert_artist(a)).collect();
+        		.iter().map(|a| a.to_slint(self.index.clone())).collect();
       	let converted_playlists: Vec<slint_generatedAppWindow::SlintPlaylist> =
       		self.search_result.playlists
-        		.iter().map(|p| self.convert_playlist(p.clone())).collect();
+        		.iter().map(|p| p.to_slint(None)).collect();
 
       	let model = slint_generatedAppWindow::SlintSearchResults {
        		tracks: ModelRc::from(&converted_tracks[..]),
@@ -122,7 +127,7 @@ impl State {
 	         	println!("Queue {:?}", self.queue);
 	     	}
 
-			let queue: Vec<SlintTrack> = self.convert_queue();
+			let queue: Vec<SlintTrack> = self.queue_to_slint();
             globals.set_queue(ModelRc::from(&queue[..]));
 
 			return true;
@@ -161,7 +166,7 @@ impl State {
         };
     }
 
-    pub fn convert_index(&self) -> Vec<slint_generatedAppWindow::SlintTrack> {
+    pub fn index_to_slint(&self) -> Vec<slint_generatedAppWindow::SlintTrack> {
         self.index
             .clone()
             .into_iter()
@@ -188,7 +193,7 @@ impl State {
             .collect()
     }
 
-    pub fn convert_queue(&self) -> Vec<slint_generatedAppWindow::SlintTrack> {
+    pub fn queue_to_slint(&self) -> Vec<slint_generatedAppWindow::SlintTrack> {
         self.queue
             .clone()
             .into_iter()
@@ -196,40 +201,10 @@ impl State {
                 let track = self.find_source_by_id(q.track_id);
 
                 if let Some((_, t)) = track {
-	                let genres: VecModel<SharedString> = t.borrow().genres
-	         			.iter().map(|g| SharedString::from(g.as_str())).collect();
-	          		let genre_model: ModelRc<SharedString> = ModelRc::new(VecModel::from(genres));
-
-                    return slint_generatedAppWindow::SlintTrack {
-                        id: t.borrow().id,
-                        title: t.borrow().title.clone().into(),
-                        artist: t.borrow().artist.clone().into(),
-                        path: t.borrow().path.clone().into(),
-                        genres: genre_model,
-                        year: t.borrow().year.to_string().into(),
-                        extension: t.borrow().extension.clone().into(),
-                        file_size: t.borrow().file_size,
-                        duration: t.borrow().duration,
-                        str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
-                        thumbnail: t.borrow().create_image_from_path(),
-                        playing: t.borrow().playing,
-                    };
+                    return t.borrow().to_slint(None)
                 }
 
-                slint_generatedAppWindow::SlintTrack {
-                    id: i32::MAX,
-                    title: SharedString::from(""),
-                    artist: SharedString::from(""),
-                    path: SharedString::from(""),
-                    genres: ModelRc::default(),
-                    year: SharedString::from(""),
-                    extension: SharedString::from(""),
-                    file_size: 0,
-                    duration: 0,
-                    str_duration: SharedString::from(""),
-                    thumbnail: slint::Image::default(),
-                    playing: false,
-                }
+                Track::to_slint_empty()
             })
             .collect()
     }
@@ -237,92 +212,25 @@ impl State {
     pub fn convert_next_track(&self) -> Option<slint_generatedAppWindow::SlintTrack> {
 		if let Some(item) = self.queue.first() {
 	  		if let Some((_, t)) = self.find_source_by_id(item.track_id) {
-					let genres: VecModel<SharedString> = t.borrow().genres
-						.iter().map(|g| SharedString::from(g.as_str())).collect();
-					let genre_model: ModelRc<SharedString> = ModelRc::new(VecModel::from(genres));
-
-             		return Some(slint_generatedAppWindow::SlintTrack {
-                       id: t.borrow().id,
-                       title: t.borrow().title.clone().into(),
-                       artist: t.borrow().artist.clone().into(),
-                       path: t.borrow().path.clone().into(),
-                       genres: genre_model,
-                       year: t.borrow().year.clone().into(),
-                       thumbnail: t.borrow().create_image_from_path(),
-                       extension: t.borrow().extension.clone().into(),
-                       file_size: t.borrow().file_size,
-                       duration: t.borrow().duration,
-                       str_duration: SharedString::from(format_into_time(t.borrow().duration as f64)),
-                       playing: t.borrow().playing,
-                   });
+             		return Some(t.borrow().to_slint(None));
 	    	}
 		}
 
-        	None
-	}
-
-	pub fn convert_track(&self, track: &Track) -> slint_generatedAppWindow::SlintTrack {
-		let genres: VecModel<SharedString> = track.genres.iter().map(|g| SharedString::from(g.as_str())).collect();
-		let genre_model: ModelRc<SharedString> = ModelRc::new(VecModel::from(genres));
-
-  		slint_generatedAppWindow::SlintTrack {
-            id: track.id,
-            title: track.title.clone().into(),
-            artist: track.artist.clone().into(),
-            path: track.path.clone().into(),
-            genres: genre_model,
-            year: track.year.clone().into(),
-            thumbnail: track.create_image_from_path(),
-            extension: track.extension.clone().into(),
-            file_size: track.file_size,
-            duration: track.duration,
-            str_duration: SharedString::from(format_into_time(track.duration as f64)),
-            playing: track.playing,
-		}
-	}
-
-	pub fn convert_artist(&self, artist: &Artist) -> slint_generatedAppWindow::SlintArtist {
-		let genres: Vec<String> = self.index
-			.iter()
-			.filter(|t| t.borrow().artist.contains(&artist.name))
-			.map(|t| t.borrow().genres.clone())
-			.flatten()
-			.collect();
-
-		let converted_genres: VecModel<SharedString> = genres
-			.iter().map(|g| SharedString::from(g.as_str())).collect();
-		let genre_model: ModelRc<SharedString> = ModelRc::new(
-			VecModel::from(converted_genres)
-		);
-
-  		slint_generatedAppWindow::SlintArtist {
-            name: artist.name.clone().into(),
-            genres: genre_model,
-            year: artist.year,
-		}
-	}
-
-	pub fn convert_timeline(&self) -> slint_generatedAppWindow::SlintTimeline {
-		slint_generatedAppWindow::SlintTimeline {
-			current: self.timeline.current.clone(),
-			length: self.timeline.length.clone(),
-			str_current: self.timeline.current.to_string().into(),
-			str_length: self.timeline.length.to_string().into(),
-		}
+       	None
 	}
 
 	pub fn convert_search_results(&self) -> slint_generatedAppWindow::SlintSearchResults {
 		let tracks = self.search_result.tracks.iter().map(|t| {
-			self.convert_track(t)
+			t.to_slint(None)
 		}).collect();
 
 
 		let artists = self.search_result.artists.iter().map(|a| {
-			self.convert_artist(a)
+			a.to_slint(self.index.clone())
 		}).collect();
 
 		let playlists = self.search_result.playlists.clone().into_iter().map(|p| {
-			self.convert_playlist(p.clone())
+			p.to_slint(None)
 		}).collect();
 
 		slint_generatedAppWindow::SlintSearchResults {
@@ -337,39 +245,9 @@ impl State {
             .clone()
             .into_iter()
             .map(|p| {
-                self.convert_playlist(p)
+                p.to_slint(None)
             })
             .collect()
-    }
-
-    pub fn convert_playlist(&self, p: Playlist) -> slint_generatedAppWindow::SlintPlaylist {
-	   	let mut sources = Vec::new();
-	    let mut tracks = Vec::new();
-	    let mut artist = String::from("");
-
-	    if let Some(s) = p.sources {
-	        sources = s;
-	    }
-
-	    if let Some(t) = p.tracks {
-	        tracks = t;
-	    }
-
-	    if let Some(a) = p.artist {
-	    	artist = a
-	    }
-
-	    slint_generatedAppWindow::SlintPlaylist {
-	        id: p.id,
-	        name: SharedString::from(p.name),
-	        artist: SharedString::from(artist),
-	        list_type: SharedString::from(p.list_type),
-	        thumbnail: SharedString::from(p.thumbnail),
-	        created_at: SharedString::from(p.created_at),
-	        listened_at: SharedString::from(p.listened_at),
-	        sources: convert_to_slint_model(sources),
-	        tracks: convert_to_slint_model(tracks),
-	    }
     }
 
     pub fn find_source_by_id(&self, id: i32) -> Option<(usize, Rc<RefCell<Track>>)> {

@@ -1,4 +1,4 @@
-use crate::logic::{convert, data_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SlintConvertable, SqlQueries, ToSqlParams}};
+use crate::{logic::{convert::{self, format_into_time}, data_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SlintConvertable, SqlQueries, ToSlint, ToSqlParams}}, slint_generatedAppWindow};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 use requests::api::yt::{MusicVideo};
@@ -143,12 +143,11 @@ impl CreateKey for Track {
     }
 }
 
-impl rusqlite::ToSql for Track {
-    #[inline]
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-        self.to_sql()
-    }
-}
+// impl rusqlite::ToSql for Track {
+//     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+//        	self.to_sql()
+//     }
+// }
 
 impl GetQuery for Track {
     fn get_query(&self, query: SqlQueries) -> String {
@@ -201,4 +200,47 @@ impl ToSqlParams for Track {
 
 impl Convertable for Track {
     fn convert_to_string(&mut self) {}
+}
+
+impl ToSlint for Track {
+	type Output = slint_generatedAppWindow::SlintTrack;
+	type Overrides = Option<String>;
+
+	fn to_slint(&self, _overrides: Self::Overrides) -> Self::Output {
+		let genres: slint::VecModel<slint::SharedString> = self.genres
+			.iter().map(|g| slint::SharedString::from(g.as_str())).collect();
+		let genre_model: slint::ModelRc<slint::SharedString> = slint::ModelRc::new(slint::VecModel::from(genres));
+
+		Self::Output {
+			id: self.id,
+	        title: self.title.clone().into(),
+	        artist: self.artist.clone().into(),
+	        path: self.path.clone().into(),
+	        genres: genre_model,
+	        year: self.year.to_string().into(),
+	        extension: self.extension.clone().into(),
+	        file_size: self.file_size,
+	        duration: self.duration,
+	        str_duration: slint::SharedString::from(format_into_time(self.duration as f64)),
+	        thumbnail: self.create_image_from_path(),
+	        playing: self.playing,
+		}
+	}
+
+	fn to_slint_empty() -> Self::Output {
+		Self::Output {
+            id: i32::MAX,
+            title: slint::SharedString::from(""),
+            artist: slint::SharedString::from(""),
+            path: slint::SharedString::from(""),
+            genres: slint::ModelRc::default(),
+            year: slint::SharedString::from(""),
+            extension: slint::SharedString::from(""),
+            file_size: 0,
+            duration: 0,
+            str_duration: slint::SharedString::from(""),
+            thumbnail: slint::Image::default(),
+            playing: false,
+        }
+	}
 }

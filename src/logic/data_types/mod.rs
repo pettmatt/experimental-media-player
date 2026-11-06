@@ -9,6 +9,8 @@ pub mod track;
 
 use rusqlite::{Row, ToSql};
 
+use crate::slint_generatedAppWindow;
+
 pub trait Instanceable {
 	fn new() -> Self;
 }
@@ -35,6 +37,14 @@ pub trait Convertable {
 
 pub trait SlintConvertable {
 	fn create_image_from_path(&self) -> slint::Image;
+}
+
+pub trait ToSlint {
+	type Output;
+	type Overrides;
+
+	fn to_slint(&self, overrides: Self::Overrides) -> Self::Output;
+	fn to_slint_empty() -> Self::Output;
 }
 
 pub enum SqlQueries {

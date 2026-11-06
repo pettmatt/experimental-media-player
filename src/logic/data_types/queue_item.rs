@@ -27,11 +27,11 @@ impl CreateKey for QueueItem {
 	}
 }
 
-impl rusqlite::ToSql for QueueItem {
-	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-		self.to_sql()
-	}
-}
+// impl rusqlite::ToSql for QueueItem {
+// 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+// 		self.to_sql()
+// 	}
+// }
 
 impl GetQuery for QueueItem {
 	fn get_query(&self, query: SqlQueries) -> String {

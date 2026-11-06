@@ -35,11 +35,11 @@ impl CreateKey for Source {
 	}
 }
 
-impl rusqlite::ToSql for Source {
-	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-		self.to_sql()
-	}
-}
+// impl rusqlite::ToSql for Source {
+// 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+// 		self.to_sql()
+// 	}
+// }
 
 impl GetQuery for Source {
 	fn get_query(&self, query: SqlQueries) -> String {

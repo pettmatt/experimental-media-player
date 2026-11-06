@@ -1,4 +1,4 @@
-use crate::logic::data_types::{source::Source, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
+use crate::{logic::{data_types::{CreateKey, FromRow, GetQuery, Instanceable, SlintConvertable, SqlQueries, ToSlint, ToSqlParams, source::Source, state::State}, slint::convert_to_slint_model}, slint_generatedAppWindow};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +20,18 @@ pub struct Playlist {
 	pub listened_at: String,
 	pub tracks: Option<Vec<AudioEntry>>,
 	pub sources: Option<Vec<Source>>,
+}
+
+impl SlintConvertable for Playlist {
+	fn create_image_from_path(&self) -> slint::Image {
+		if let Ok(loaded_image) = slint::Image::load_from_path(
+			std::path::Path::new(self.thumbnail.as_str())
+		) {
+	  		loaded_image
+	 	} else {
+      		slint::Image::default()
+       	}
+	}
 }
 
 impl std::fmt::Display for Playlist {
@@ -70,11 +82,11 @@ impl CreateKey for Playlist {
 	}
 }
 
-impl rusqlite::ToSql for Playlist {
-	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-		self.to_sql()
-	}
-}
+// impl rusqlite::ToSql for Playlist {
+// 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+// 		self.to_sql()
+// 	}
+// }
 
 impl GetQuery for Playlist {
 	fn get_query(&self, query: SqlQueries) -> String {
@@ -110,5 +122,96 @@ impl ToSqlParams for Playlist {
 			&self.thumbnail as &dyn ToSql,
 			&self.artist as &dyn ToSql
 		]
+	}
+}
+
+enum PrivateQueries {
+	GetTracks,
+	GetArtists,
+	GetSources,
+}
+
+impl Playlist {
+	fn get_private_query(&self, private_query: PrivateQueries) -> String {
+		match private_query {
+			PrivateQueries::GetTracks => String::from("
+				SELECT t.* FROM playlist_tracks pt
+	            JOIN tracks t ON t.id = pt.track_id
+	            WHERE pt.playlist_id = ?1
+			"),
+			PrivateQueries::GetArtists => String::from("
+				SELECT pa.artist_name FROM playlist_artists pa
+             	WHERE pa.playlist_id = ?1
+            "),
+			PrivateQueries::GetSources => String::from("
+				SELECT s.* FROM playlist_sources ps
+	            JOIN sources s ON s.id = ps.source_id
+	            WHERE ps.playlist_id = ?1
+			"),
+		}
+	}
+}
+
+impl ToSlint for Playlist {
+	type Output = slint_generatedAppWindow::SlintPlaylist;
+	type Overrides = Option<State>;
+
+	fn to_slint(&self, _overrides: Self::Overrides) -> Self::Output {
+		let mut sources = Vec::new();
+		let mut tracks = Vec::new();
+		let mut artist = String::from("");
+		let thumbnail = self.create_image_from_path();
+
+		if let Some(s) = &self.sources {
+		    sources = s.clone();
+		}
+
+		if let Some(t) = &self.tracks {
+		    tracks = t.clone();
+		}
+
+		if let Some(a) = &self.artist {
+			artist = a.clone();
+		}
+
+		// if let Some(state) = overrides {
+		// 	let converted_tracks = tracks.iter().map(|entry| {
+		// 		let o_track = state.find_source_by_id(entry.id);
+		// 		if let Some((_, track)) = o_track {
+		// 			track.borrow().to_slint(None)
+		// 		} else {
+		// 			let mut t = Track::to_slint_empty();
+		// 			t.title = "Not found".to_string().into();
+		// 			t
+		// 		}
+		// 	});
+		// }
+
+		Self::Output {
+		    id: self.id,
+		    name: slint::SharedString::from(self.name.clone()),
+		    artist: slint::SharedString::from(artist),
+		    list_type: slint::SharedString::from(self.list_type.clone()),
+		    thumbnail: thumbnail,
+		    created_at: slint::SharedString::from(self.created_at.clone()),
+		    listened_at: slint::SharedString::from(self.listened_at.clone()),
+		    sources: convert_to_slint_model(sources),
+		    tracks: convert_to_slint_model(tracks),
+		}
+	}
+
+	fn to_slint_empty() -> Self::Output {
+		let result = slint::Image::load_from_path(&std::path::Path::new(""));
+		Self::Output {
+			id: i32::MAX,
+			name: slint::SharedString::from("Nameless playlist"),
+			artist: slint::SharedString::from(""),
+			list_type: slint::SharedString::from("Playlist"),
+			thumbnail: result.unwrap(),
+			created_at: slint::SharedString::from(""),
+			listened_at: slint::SharedString::from(""),
+			sources: convert_to_slint_model(Vec::<Source>::new()),
+			tracks: convert_to_slint_model(Vec::<AudioEntry>::new()),
+        }
 	}
 }

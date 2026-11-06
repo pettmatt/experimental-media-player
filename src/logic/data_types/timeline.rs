@@ -1,4 +1,4 @@
-use crate::{SlintState, SlintTimeline, logic::{data_types::track::Track, convert::format_into_time}, slint_generatedAppWindow};
+use crate::{SlintState, SlintTimeline, logic::{convert::format_into_time, data_types::{ToSlint, track::Track}}, slint_generatedAppWindow};
 use std::{cell::RefCell, rc::Rc};
 use slint::SharedString;
 
@@ -33,4 +33,27 @@ impl Timeline {
 	        str_length: SharedString::from(format_into_time(self.length as f64)),
 	    }
     }
+}
+
+impl ToSlint for Timeline {
+	type Output = slint_generatedAppWindow::SlintTimeline;
+	type Overrides = Option<String>;
+
+	fn to_slint(&self, _overrides: Self::Overrides) -> Self::Output {
+		Self::Output {
+			current: self.current.clone(),
+			length: self.length.clone(),
+			str_current: self.current.to_string().into(),
+			str_length: self.length.to_string().into(),
+		}
+	}
+
+	fn to_slint_empty() -> Self::Output {
+		Self::Output {
+			current: 0,
+			length: 0,
+			str_current: 0.to_string().into(),
+			str_length: 0.to_string().into(),
+        }
+	}
 }

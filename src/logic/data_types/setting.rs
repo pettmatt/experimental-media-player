@@ -65,11 +65,11 @@ impl CreateKey for Setting {
 	}
 }
 
-impl rusqlite::ToSql for Setting {
-	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
-		self.to_sql()
-	}
-}
+// impl rusqlite::ToSql for Setting {
+// 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+// 		self.to_sql()
+// 	}
+// }
 
 impl GetQuery for Setting {
 	fn get_query(&self, query: SqlQueries) -> String {
