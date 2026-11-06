@@ -6,38 +6,48 @@ use std::collections::HashMap;
 
 use super::custom::ErrorHandler;
 
+const MAX_CONNECTION_ATTEMPTS: u32 = 3;
+
 fn connect() -> Result<Connection, ErrorHandler> {
     let db_path = String::from("./database/main.db");
-    let result: Result<Connection, rusqlite::Error> = Connection::open(&db_path);
+    let mut attempt = 0;
 
-    match result {
-        Ok(connect) => Ok(connect),
-        Err(error) => {
-	        println!("Error occured: {}", error);
-	        println!("Trying to solve the problem by creating the db file.");
+    loop {
+    	attempt += 1;
+     	let result: Result<Connection, rusqlite::Error> = Connection::open(&db_path);
+     	match result {
+      		Ok(connection) => return Ok(connection),
+        	Err(error) if attempt >= MAX_CONNECTION_ATTEMPTS => {
+       	        eprintln!("Unhandled SQLite error occured: {}", error);
+       	        return Err(ErrorHandler::Sqlite(error))
+         	},
+	        Err(error) => {
+	            eprintln!("connect attempt {attempt}/{MAX_CONNECTION_ATTEMPTS} failed: {error}");
+       	        eprintln!("Trying to solve the problem by creating the db file.");
 
-			let coverable_errors =
-				error.sqlite_error_code() == Some(ErrorCode::NotFound) ||
-				error.sqlite_error_code() == Some(ErrorCode::CannotOpen);
+     			let coverable_errors =
+    				error.sqlite_error_code() == Some(ErrorCode::NotFound) ||
+    				error.sqlite_error_code() == Some(ErrorCode::CannotOpen);
 
-	        if coverable_errors {
-	            let mut builder = std::fs::DirBuilder::new();
-	            builder.recursive(true).create("./database").unwrap();
+       	        if coverable_errors {
+       	            let mut builder = std::fs::DirBuilder::new();
+       	            builder.recursive(true).create("./database").unwrap();
 
-	            match std::fs::File::create(db_path) {
-	                Ok(file) => {
-	                    println!("Created sqlite db file: {:?}", file);
-	                    return self::connect();
-	                }
-	                Err(message) => {
-	                    return Err(ErrorHandler::Io(message));
-	                }
-	            }
+       	            match std::fs::File::create(db_path) {
+       	                Ok(file) => {
+       	                    println!("Created sqlite db file: {:?}", file);
+       	                    return self::connect();
+       	                }
+       	                Err(message) => {
+       	                    return Err(ErrorHandler::Io(message));
+       	                }
+       	            }
+       	        } else {
+					// Small wait so we have better chance to connect successfully
+		            std::thread::sleep(std::time::Duration::from_millis(200 * attempt as u64));
+                }
 	        }
-
-	        println!("Unhandled SQLite error occured: {}", error);
-	        Err(ErrorHandler::Sqlite(error))
-        },
+      	}
     }
 }
 
@@ -65,6 +75,7 @@ pub fn initialize_tables() -> Result<(), ()> {
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
 			"CREATE TABLE IF NOT EXISTS artists (
+				id			INTEGER PRIMARY KEY,
 				name		TEXT NOT NULL PRIMARY KEY,
 				year		INTEGER,
 				thumbnail	TEXT,
@@ -162,7 +173,7 @@ pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instancea
     }
 }
 
-pub fn add_record<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(new_record: T)
+pub fn add_record<T: std::fmt::Debug + GetQuery + ToSqlParams>(new_record: T)
 -> Result<(), ()> {
     if let Ok(connection) = connect() {
         if let Err(error) = connection.execute(
@@ -191,7 +202,7 @@ struct ErrorBody {
 }
 
 pub fn add_records<
-    T: std::fmt::Display + std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams + Convertable,
+    T: std::fmt::Display + std::fmt::Debug + GetQuery + ToSqlParams + Convertable,
 >(new_records: Vec<T>) -> Result<(), ()> {
     if let Ok(connection) = connect() {
         let mut result: HashMap<usize, ErrorBody> = HashMap::new();
@@ -244,7 +255,7 @@ pub fn add_records<
     Err(())
 }
 
-pub fn update_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
+pub fn update_records<T: std::fmt::Debug + GetQuery + ToSqlParams>(
     new_records: Vec<T>,
 ) -> Result<(), ()> {
     if let Ok(connection) = connect() {
@@ -254,7 +265,7 @@ pub fn update_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlPar
     Err(())
 }
 
-pub fn delete_records<T: std::fmt::Debug + rusqlite::ToSql + GetQuery + ToSqlParams>(
+pub fn delete_records<T: std::fmt::Debug + GetQuery + ToSqlParams>(
     record_ids: Vec<i32>,
 ) -> Result<(), ()> {
     if let Ok(connection) = connect() {
