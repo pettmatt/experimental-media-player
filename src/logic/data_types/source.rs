@@ -1,4 +1,4 @@
-use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Convertable, FromRow, GetQuery, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
@@ -14,8 +14,8 @@ impl std::fmt::Display for Source {
 	}
 }
 
-impl Instanceable for Source {
-	fn new() -> Self {
+impl Default for Source {
+	fn default() -> Self {
 		Self { origin: "".to_string(), path: "".to_string() }
 	}
 }
@@ -29,11 +29,11 @@ impl FromRow for Source {
 	}
 }
 
-impl CreateKey for Source {
-	fn create_key(&self) -> String {
-		String::from(&self.path)
-	}
-}
+// impl CreateKey for Source {
+// 	fn create_key(&self) -> String {
+// 		String::from(&self.path)
+// 	}
+// }
 
 // impl rusqlite::ToSql for Source {
 // 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
@@ -52,14 +52,12 @@ impl GetQuery for Source {
 			SqlQueries::Update => String::from("
 				UPDATE sources
 				SET
-					origin = (origin),
-					path = (path),
-				WHERE path = (path)
-				VALUES (?, ?);
+					origin = ?,
+					path = ?
+				WHERE path = ?;
 			"),
 			SqlQueries::Delete => String::from("
-				DELETE FROM sources WHERE path = (path)
-				VALUES (?);
+				DELETE FROM sources WHERE path = ?;
 			"),
 		}
 	}

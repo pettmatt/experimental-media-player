@@ -1,6 +1,5 @@
 use std::{cell::RefCell, rc::Rc};
-
-use crate::{logic::data_types::{CreateKey, FromRow, GetQuery, Instanceable, SlintConvertable, SqlQueries, ToSlint, ToSqlParams, state::State, track::Track}, slint_generatedAppWindow};
+use crate::{logic::data_types::{FromRow, GetQuery, SlintConvertable, SqlQueries, ToSlint, ToSqlParams, track::Track}, slint_generatedAppWindow};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
@@ -12,20 +11,8 @@ pub struct Artist {
 	pub thumbnail: String
 }
 
-impl SlintConvertable for Artist {
-	fn create_image_from_path(&self) -> slint::Image {
-		if let Ok(loaded_image) = slint::Image::load_from_path(
-			std::path::Path::new(self.thumbnail.as_str())
-		) {
-	  		loaded_image
-	 	} else {
-      		slint::Image::default()
-       	}
-	}
-}
-
-impl Instanceable for Artist {
-	fn new() -> Self {
+impl Default for Artist {
+	fn default() -> Self {
 		Self {
 			id: -1,
 			name: "".to_string(),
@@ -46,11 +33,11 @@ impl FromRow for Artist {
 	}
 }
 
-impl CreateKey for Artist {
-	fn create_key(&self) -> String {
-		String::from(&self.name)
-	}
-}
+// impl CreateKey for Artist {
+// 	fn create_key(&self) -> String {
+// 		String::from(&self.name)
+// 	}
+// }
 
 // impl rusqlite::ToSql for Artist {
 // 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
@@ -69,15 +56,13 @@ impl GetQuery for Artist {
 			SqlQueries::Update => String::from("
 				UPDATE artists
 				SET
-					name = (name),
-					year = (year),
-					thumbnail = (thumbnail),
-				WHERE name = (name)
-				VALUES (?, ?, ?);
+					name = ?,
+					year = ?,
+					thumbnail = ?
+				WHERE name = ?;
 			"),
 			SqlQueries::Delete => String::from("
-				DELETE FROM artists WHERE name = (name)
-				VALUES (?);
+				DELETE FROM artists WHERE name = ?;
 			"),
 		}
 	}
@@ -90,6 +75,18 @@ impl ToSqlParams for Artist {
 			&self.year as &dyn ToSql,
 			&self.thumbnail as &dyn ToSql,
 		]
+	}
+}
+
+impl SlintConvertable for Artist {
+	fn create_image_from_path(&self) -> slint::Image {
+		if let Ok(loaded_image) = slint::Image::load_from_path(
+			std::path::Path::new(self.thumbnail.as_str())
+		) {
+	  		loaded_image
+	 	} else {
+      		slint::Image::default()
+       	}
 	}
 }
 

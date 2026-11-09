@@ -1,4 +1,4 @@
-use crate::{logic::{convert::{self, format_into_time}, data_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SlintConvertable, SqlQueries, ToSlint, ToSqlParams}}, slint_generatedAppWindow};
+use crate::{logic::{convert::{self, format_into_time}, data_types::{Convertable, FromRow, GetQuery, SlintConvertable, SqlQueries, ToSlint, ToSqlParams}}, slint_generatedAppWindow};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 use requests::api::yt::{MusicVideo};
@@ -83,8 +83,8 @@ impl std::fmt::Display for Track {
     }
 }
 
-impl Instanceable for Track {
-    fn new() -> Self {
+impl Default for Track {
+    fn default() -> Self {
         Self {
             id: 0,
             title: "".to_string(),
@@ -137,11 +137,11 @@ impl FromRow for Track {
     }
 }
 
-impl CreateKey for Track {
-    fn create_key(&self) -> String {
-        format!("{}", self.path)
-    }
-}
+// impl CreateKey for Track {
+//     fn create_key(&self) -> String {
+//         format!("{}", self.path)
+//     }
+// }
 
 // impl rusqlite::ToSql for Track {
 //     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
@@ -160,22 +160,20 @@ impl GetQuery for Track {
  			SqlQueries::Update => String::from("
 				UPDATE tracks
 				SET
-					title = (title),
-					artist = (artist),
-					path = (path),
-					genres = (genres),
-					year = (year),
-					thumbnail = (thumbnail),
-					extension = (extension),
-					file_size = (file_size),
-					duration = (duration),
-					playing = (playing),
-				WHERE id = (id)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+					title = ?,
+					artist = ?,
+					path = ?,
+					genres = ?,
+					year = ?,
+					thumbnail = ?,
+					extension = ?,
+					file_size = ?,
+					duration = ?,
+					playing = ?
+				WHERE id = ?;
     		"),
 			SqlQueries::Delete => String::from("
-				DELETE FROM tracks WHERE id = (id)
-				VALUES (?);
+				DELETE FROM tracks WHERE id = ?;
 			"),
         }
     }

@@ -1,4 +1,4 @@
-use crate::{logic::{data_types::{CreateKey, FromRow, GetQuery, Instanceable, SlintConvertable, SqlQueries, ToSlint, ToSqlParams, source::Source, state::State}, slint::convert_to_slint_model}, slint_generatedAppWindow};
+use crate::{logic::{data_types::{FromRow, GetQuery, SlintConvertable, SqlQueries, ToSlint, ToSqlParams, source::Source, state::State}, slint::convert_to_slint_model}, slint_generatedAppWindow};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
@@ -22,18 +22,6 @@ pub struct Playlist {
 	pub sources: Option<Vec<Source>>,
 }
 
-impl SlintConvertable for Playlist {
-	fn create_image_from_path(&self) -> slint::Image {
-		if let Ok(loaded_image) = slint::Image::load_from_path(
-			std::path::Path::new(self.thumbnail.as_str())
-		) {
-	  		loaded_image
-	 	} else {
-      		slint::Image::default()
-       	}
-	}
-}
-
 impl std::fmt::Display for Playlist {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(
@@ -43,8 +31,8 @@ impl std::fmt::Display for Playlist {
 	}
 }
 
-impl Instanceable for Playlist {
-	fn new() -> Self {
+impl Default for Playlist {
+	fn default() -> Self {
 		Self {
 			id: 0,
 			name: "".to_string(),
@@ -76,11 +64,11 @@ impl FromRow for Playlist {
 	}
 }
 
-impl CreateKey for Playlist {
-	fn create_key(&self) -> String {
-		String::from(&self.name)
-	}
-}
+// impl CreateKey for Playlist {
+// 	fn create_key(&self) -> String {
+// 		String::from(&self.name)
+// 	}
+// }
 
 // impl rusqlite::ToSql for Playlist {
 // 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
@@ -99,12 +87,11 @@ impl GetQuery for Playlist {
 			SqlQueries::Update => String::from("
 				UPDATE playlists
 				SET
-					name = (name),
-					list = (list_type),
-					thumbnail = (thumbnail),
-					artist = (artist),
-				WHERE name = (name)
-				VALUES (?, ?, ?, ?);
+					name = ?,
+					list = ?,
+					thumbnail = ?,
+					artist = ?
+				WHERE name = ?;
 			"),
 			SqlQueries::Delete => String::from("
 				DELETE FROM playlists WHERE name = (name)
@@ -149,6 +136,18 @@ impl Playlist {
 	            WHERE ps.playlist_id = ?1
 			"),
 		}
+	}
+}
+
+impl SlintConvertable for Playlist {
+	fn create_image_from_path(&self) -> slint::Image {
+		if let Ok(loaded_image) = slint::Image::load_from_path(
+			std::path::Path::new(self.thumbnail.as_str())
+		) {
+	  		loaded_image
+	 	} else {
+      		slint::Image::default()
+       	}
 	}
 }
 

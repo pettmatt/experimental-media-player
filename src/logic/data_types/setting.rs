@@ -1,4 +1,4 @@
-use crate::logic::data_types::{Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Convertable, FromRow, GetQuery, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
@@ -35,8 +35,8 @@ impl std::fmt::Display for Setting {
 	}
 }
 
-impl Instanceable for Setting {
-	fn new() -> Self {
+impl Default for Setting {
+	fn default() -> Self {
 		Self {
 			name: "".to_string(),
 			value: "".to_string(),
@@ -59,11 +59,11 @@ impl FromRow for Setting {
 	}
 }
 
-impl CreateKey for Setting {
-	fn create_key(&self) -> String {
-		String::from(&self.name)
-	}
-}
+// impl CreateKey for Setting {
+// 	fn create_key(&self) -> String {
+// 		String::from(&self.name)
+// 	}
+// }
 
 // impl rusqlite::ToSql for Setting {
 // 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
@@ -82,15 +82,13 @@ impl GetQuery for Setting {
 			SqlQueries::Update => String::from("
 				UPDATE settings
 				SET
-					name = (name),
-					value = (value),
-					default_value = (default_value),
-				WHERE name = (name)
-				VALUES (?, ?, ?);
+					name = ?,
+					value = ?,
+					default_value = ?
+				WHERE name = ?;
 			"),
 			SqlQueries::Delete => String::from("
-				DELETE FROM settings WHERE name = (name)
-				VALUES (?);
+				DELETE FROM settings WHERE name = ?;
 			"),
 		}
 	}

@@ -1,5 +1,5 @@
 use crate::logic::data_types::{
-    Convertable, CreateKey, FromRow, GetQuery, Instanceable, SqlQueries, ToSqlParams,
+    Convertable, FromRow, GetQuery, SqlQueries, ToSqlParams,
 };
 use rusqlite::{Connection, ErrorCode};
 use std::collections::HashMap;
@@ -75,7 +75,6 @@ pub fn initialize_tables() -> Result<(), ()> {
 				created_at 	DATETIME DEFAULT (datetime('now', 'localtime'))
 			);",
 			"CREATE TABLE IF NOT EXISTS artists (
-				id			INTEGER PRIMARY KEY,
 				name		TEXT NOT NULL PRIMARY KEY,
 				year		INTEGER,
 				thumbnail	TEXT,
@@ -148,12 +147,12 @@ pub fn initialize_tables() -> Result<(), ()> {
     Err(())
 }
 
-pub fn get_table<T: std::fmt::Debug + FromRow + CreateKey + GetQuery + Instanceable>()
+pub fn get_table<T: std::fmt::Debug + FromRow /*+ CreateKey*/ + GetQuery + Default>()
 -> Result<Vec<T>, ErrorHandler> {
     match connect() {
         Ok(connection) => {
             let mut list: Vec<T> = Vec::new();
-            let instance = T::new();
+            let instance = T::default();
             let query = instance.get_query(SqlQueries::Select);
             let mut statement = connection.prepare(&query)?;
             let iter = statement.query_map([], |row| {
@@ -233,10 +232,12 @@ pub fn add_records<
 		println!("Add record failure hashmap:");
 		let mut no_errors = true;
         for (id, body) in &result {
-        	no_errors = false;
 	        if body.is_error {
 				match &body.message {
-					Err(e) => eprintln!("Error [id {id}] record \"{}\": {e}", body.record),
+					Err(e) => {
+						eprintln!("Error [id {id}] record \"{}\": {e}", body.record);
+						no_errors = false;
+					},
 	                Ok(code) => eprintln!(
 	                    "Error [id {id}] record \"{}\": marked as error but message was Ok({code})",
 	                    body.record

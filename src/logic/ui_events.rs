@@ -1,13 +1,15 @@
 use super::{audio::media_player::MediaPlayer, source};
+use crate::logic::data_types::artist::Artist;
 use crate::logic::data_types::playlist::Playlist;
 use crate::logic::data_types::queue_item::QueueItem;
 use crate::logic::data_types::setting::Setting;
 use crate::logic::data_types::source::Source;
+use crate::logic::data_types::state::SearchResults;
 use crate::logic::data_types::track::Track;
 use crate::logic::database;
 use crate::logic::queue::Queue;
 use crate::logic::validate_sources;
-use crate::{AppWindow, ContextMenuActions, MediaActions, SearchActions, SettingActions, SlintState, State};
+use crate::{AppWindow, ContextMenuActions, MainView, MediaActions, SearchActions, SettingActions, SlintState, State};
 use slint::{ComponentHandle};
 use std::{cell::RefCell, rc::Rc};
 
@@ -94,14 +96,13 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
 
     // Media elements bottom panel.
     global_media_actions.on_media_start({
-        let app_clone = weak_app.clone();
+       	let app_clone = weak_app.clone();
         let state_clone = Rc::clone(state);
         let player_clone = Rc::clone(&player);
-        let index_clone = state_clone.borrow().index.clone();
+       	let index_clone = state_clone.borrow().index.clone(); // TODO: Might be stale. Snapshot is stale if it's unable to play freshly added tracks. (not confirmed)
 
         move |id: i32| {
             println!("Media start triggered! On track id : {}", &id);
-        	let timer = slint::Timer::default;
          	state_clone.borrow_mut().index_playing_reset();
 
             if let Some((index, track)) = index_clone
@@ -262,11 +263,11 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
         let app_clone = weak_app.clone();
         let state_clone = Rc::clone(state);
 
-        move |playlist_id: i32, media_id: i32| {
+        move |playlist_id: i32, track_id: i32| {
             if let Some(app) = app_clone.upgrade() {
                 state_clone.borrow_mut().add_to_playlist(
                     playlist_id,
-                    media_id,
+                    track_id,
                     &app.global::<SlintState>(),
                 );
             }
@@ -313,6 +314,41 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
         }
     });
 
+    global_search_actions.on_view_change({
+   		let state_clone = Rc::clone(state);
+		let app_clone = weak_app.clone();
+
+		move |main_view: MainView, unique_key: i32| {
+			if let Some(app) = app_clone.upgrade() {
+				let global_state = app.global::<SlintState>();
+				let value = crate::SlintSelected {
+		     		main_view: main_view,
+		       		selected_id: unique_key,
+		     	};
+
+				state_clone.borrow_mut().set_main_view(value, &global_state);
+			}
+		}
+    });
+
+    global_search_actions.on_view_change_generic({
+   		let state_clone = Rc::clone(state);
+		let app_clone = weak_app.clone();
+
+		move |main_view: MainView| {
+			if let Some(app) = app_clone.upgrade() {
+				let global_state = app.global::<SlintState>();
+				let value = crate::SlintSelected {
+		     		main_view: main_view,
+					// To indicate that the view was changed with intention
+		       		selected_id: -2,
+		     	};
+
+				state_clone.borrow_mut().set_main_view(value, &global_state);
+			}
+		}
+    });
+
 	// TODO: make sure the search_term is valid (shouldn't be trusted)
     global_search_actions.on_search_local({
 	    let state_clone = Rc::clone(state);
@@ -322,19 +358,46 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
 		// TODO: Tags should a hash map.
 	    move |search_term: slint::SharedString, tags: slint::ModelRc<slint::SharedString>| {
 			let s_term = search_term.to_ascii_lowercase();
+			let mut found_artists: Vec<String> = Vec::new();
 			let tracks: Vec<Track> = state_clone.borrow().index
 				.iter()
 				.filter(|track| {
 					let t = track.borrow();
-					t.artist.to_ascii_lowercase().contains(&s_term) ||
-					t.title.to_ascii_lowercase().contains(&s_term)
+					let found = t.artist.to_ascii_lowercase().contains(&s_term);
+					if found && !found_artists.contains(&s_term) {
+						found_artists.push(track.borrow().artist.clone())
+					}
+					found && !found_artists.contains(&s_term)
 				})
 				.map(|track| track.borrow().clone())
 				.collect();
 
+			let mut artists: Vec<Artist> = Vec::new();
+			if let Ok(list) = database::get_table::<Artist>() {
+				artists = list
+					.iter()
+					.cloned()
+					.filter(|artist| found_artists.contains(&artist.name)).collect();
+			};
+
+			let playlists: Vec<Playlist> = state_clone.borrow().playlists
+				.iter()
+				.filter(|p| {
+					let found = p.name.to_ascii_lowercase().contains(&s_term);
+					found
+				})
+				.map(|p| p.clone())
+				.collect();
+
+			let results = SearchResults {
+				tracks,
+				artists,
+				playlists: playlists,
+			};
+
 			if let Some(app) = app_clone.upgrade() {
 				let global_state = app.global::<SlintState>();
-	        	state_clone.borrow_mut().set_search_result(tracks.clone(), &global_state);
+	        	state_clone.borrow_mut().set_search_results(results, &global_state);
 				println!("State search results changed: {:?}", state_clone.borrow().search_result);
 			}
 	    }
@@ -419,12 +482,13 @@ pub mod audio_control_events {
     use std::{cell::RefCell, rc::Rc};
 
     pub async fn handle_media_start(media_player: Rc<RefCell<MediaPlayer>>, track: Rc<RefCell<Track>>) {
-        let _ = media_player.borrow_mut().play(track).await;
-        let watch_p = media_player.clone();
-        let timer = watch_track_ending(watch_p, media_player.borrow().generation,
-       	);
-        media_player.clone().borrow_mut().end_timer = Some(timer);
-
+    	slint::spawn_local(async move {
+	        let _ = media_player.borrow_mut().play(track).await;
+	        let watch_p = media_player.clone();
+	        let timer = watch_track_ending(watch_p, media_player.borrow().generation,
+	       	);
+	        media_player.clone().borrow_mut().end_timer = Some(timer);
+		}).unwrap();
     }
 
     fn watch_track_ending(media_player: Rc<RefCell<MediaPlayer>>, generation: u64) -> slint::Timer {
@@ -454,12 +518,14 @@ pub mod audio_control_events {
 
     pub fn handle_media_change(media_player: Rc<RefCell<MediaPlayer>>, (previous_index, current_index): (usize, usize)) {
         // If the queue moved only by one, skip to next track
-        let difference = previous_index.saturating_sub(current_index);
-        if difference == 1 || difference == usize::MIN {
-            if let Ok(Some(track)) = media_player.borrow_mut().next() {
-            	let _ = handle_media_start(media_player.clone(), track);
-            }
-        }
+       	slint::spawn_local(async move {
+	        let difference = previous_index.saturating_sub(current_index);
+	        if difference == 1 || difference == usize::MIN {
+	            if let Ok(Some(track)) = media_player.borrow_mut().next() {
+            		handle_media_start(media_player.clone(), track).await
+	            }
+	        }
+       	}).unwrap();
         // Else the queue needs to be remade within the media player, if the queue is loopable.
     }
 

@@ -27,14 +27,16 @@ impl State {
  	pub fn set_state(&mut self, globals: &SlintState) {
   		let current_track = self.index.iter().find(|track| {
 	  		track.borrow().playing
-	  	}).unwrap();
+	  	});
 
     	globals.set_index(ModelRc::from(&self.index_to_slint()[..]));
      	globals.set_queue(ModelRc::from(&self.queue_to_slint()[..]));
       	globals.set_playlist(ModelRc::from(&self.convert_playlists()[..]));
        	globals.set_timeline(self.timeline.to_slint(None));
         // globals.set_settings(state.get_settings());
-        globals.set_current_track(current_track.borrow().to_slint(None));
+        if let Some(track) = current_track {
+        	globals.set_current_track(track.borrow().to_slint(None));
+        }
         globals.set_volume(self.volume.clone());
     }
 
@@ -136,7 +138,7 @@ impl State {
      	false
     }
 
-    pub fn add_to_playlist(&mut self, playlist_id: i32, media_id: i32, globals: &SlintState) {
+    pub fn add_to_playlist(&mut self, playlist_id: i32, track_id: i32, globals: &SlintState) {
         let playlist: Option<&mut Playlist> = self
             .playlists
             .iter_mut()
@@ -148,7 +150,7 @@ impl State {
 
             if let Ok(duration) = since {
                 let new_entry = AudioEntry {
-                    id: media_id,
+                    id: track_id,
                     added_at: format!("{}", duration.as_secs()),
                 };
 

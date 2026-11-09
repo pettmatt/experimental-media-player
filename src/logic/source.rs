@@ -1,12 +1,8 @@
-use crate::logic::{data_types::{playlist::{Playlist}, source::Source, track::Track}, database};
-use super::{
-    custom::ErrorHandler,
-};
+use std::{borrow::Cow, fmt::Error, fs, ops::Not, path::{Path, PathBuf}};
 use lofty::{self, file::TaggedFileExt, file::AudioFile, probe::Probe, tag::Accessor};
 use native_dialog::DialogBuilder;
-use std::{
-    borrow::Cow, fmt::Error, fs, ops::Not, path::{Path, PathBuf}
-};
+use crate::logic::{data_types::{playlist::Playlist, source::Source, track::Track}, database};
+use super::custom::ErrorHandler;
 
 pub fn new_local_source() -> Option<PathBuf> {
     let path: Option<PathBuf> = DialogBuilder::file()
@@ -57,7 +53,7 @@ pub fn read_source(source: PathBuf) -> Result<Vec<Track>, Error> {
             };
 
             let path = entry_path.to_string_lossy().to_string();
-            let id = list.len() as i32;
+            let id = list.len() as i32; // SQL generates ids for every entry, so this is just to keep track of the new entries.
             let mut artist = "unknown".to_string();
             let mut title = "".to_string();
             let mut genres = Vec::new();

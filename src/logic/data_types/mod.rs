@@ -6,22 +6,16 @@ pub mod setting;
 pub mod source;
 pub mod artist;
 pub mod track;
-
+pub mod event_context;
 use rusqlite::{Row, ToSql};
-
-use crate::slint_generatedAppWindow;
-
-pub trait Instanceable {
-	fn new() -> Self;
-}
 
 pub trait FromRow {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> where Self: Sized;
 }
 
-pub trait CreateKey {
-	fn create_key(&self) -> String;
-}
+// pub trait CreateKey { // Remove if removing doesn't create issues
+// 	fn create_key(&self) -> String;
+// }
 
 pub trait GetQuery {
 	fn get_query(&self, query: SqlQueries) -> String;

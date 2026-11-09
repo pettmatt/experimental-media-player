@@ -1,4 +1,4 @@
-use crate::logic::data_types::{Instanceable, Convertable, CreateKey, FromRow, GetQuery, SqlQueries, ToSqlParams};
+use crate::logic::data_types::{Convertable, FromRow, GetQuery, SqlQueries, ToSqlParams};
 use rusqlite::{Row, ToSql};
 use serde::{Deserialize, Serialize};
 
@@ -7,8 +7,8 @@ pub struct QueueItem {
 	pub track_id: i32,
 }
 
-impl Instanceable for QueueItem {
-	fn new() -> Self {
+impl Default for QueueItem {
+	fn default() -> Self {
 		Self { track_id: 0 }
 	}
 }
@@ -16,16 +16,16 @@ impl Instanceable for QueueItem {
 impl FromRow for QueueItem {
 	fn from_row(row: &Row) -> Result<Self, Box<dyn std::error::Error>> {
 		Ok(Self {
-			track_id: row.get("media_id")?,
+			track_id: row.get("track_id")?,
 		})
 	}
 }
 
-impl CreateKey for QueueItem {
-	fn create_key(&self) -> String {
-		self.track_id.to_string()
-	}
-}
+// impl CreateKey for QueueItem {
+// 	fn create_key(&self) -> String {
+// 		self.track_id.to_string()
+// 	}
+// }
 
 // impl rusqlite::ToSql for QueueItem {
 // 	fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
@@ -43,8 +43,7 @@ impl GetQuery for QueueItem {
 			SqlQueries::Select => String::from("SELECT * FROM sessions;"),
 			SqlQueries::Update => String::from(""),
 			SqlQueries::Delete => String::from("
-				DELETE FROM sessions WHERE id = (id)
-				VALUES (?);
+				DELETE FROM sessions WHERE id = ?;
 			"),
 		}
 	}
