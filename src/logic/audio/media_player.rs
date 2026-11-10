@@ -7,7 +7,7 @@ use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Tween};
 use std::cell::RefCell;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::rc::Rc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub struct MediaPlayer {
@@ -16,8 +16,8 @@ pub struct MediaPlayer {
     pub currently: Option<Rc<RefCell<Track>>>,
     controls: Controls,
     manager: Option<AudioManager<DefaultBackend>>,
-    pub handle: Option<StreamingSoundHandle<kira::sound::FromFileError>>,
-    pub end_timer: Option<slint::Timer>,
+    pub handle: Arc<Mutex<Option<StreamingSoundHandle<kira::sound::FromFileError>>>>,
+    pub end_timer: Arc<Mutex<Option<slint::Timer>>>,
 }
 
 pub struct Controls {
@@ -34,6 +34,32 @@ pub struct Controls {
 // TODO: Add a logic that puts tracks from queue to "trash"-queue.
 // TODO: Add a logic picks random track (would use trash-queue to prevent to pick previous tracks).
 
+impl Clone for MediaPlayer {
+	fn clone(&self) -> Self {
+		let volume = self.controls.volume.lock().unwrap().clone();
+		let position = self.controls.position.lock().unwrap().clone();
+		let length = self.controls.length.lock().unwrap().clone();
+
+		Self {
+  			global_state: self.global_state.clone(),
+            currently: self.currently.clone(),
+            manager: None,
+            handle: self.handle.clone(),
+            controls: Controls {
+                loop_pick: self.controls.loop_pick,
+                rng_pick: self.controls.rng_pick,
+                pause: self.controls.pause,
+                stopped: self.controls.stopped,
+                volume: Mutex::from(volume),
+                position: Mutex::from(position),
+                length: Mutex::from(length),
+            },
+       		generation: self.generation,
+        	end_timer: self.end_timer.clone(),
+		}
+	}
+}
+
 impl MediaPlayer {
     pub fn new(state: Rc<RefCell<State>>) -> Self {
     	let mut hasher = DefaultHasher::new();
@@ -42,7 +68,7 @@ impl MediaPlayer {
         	global_state: state,
             currently: None,
             manager: None,
-            handle: None,
+            handle: Arc::new(Mutex::new(None)),
             controls: Controls {
                 loop_pick: false,
                 rng_pick: false,
@@ -53,19 +79,19 @@ impl MediaPlayer {
                 length: Mutex::new(Duration::new(0, 0)),
             },
        		generation: hasher.finish(),
-         	end_timer: None
+         	end_timer: Arc::new(Mutex::new(None))
         }
     }
 
-    pub async fn play(&mut self, source: Rc<RefCell<Track>>) -> Result<(), Box<dyn std::error::Error>> {
-	    println!("Should start to play with {:?}", &source);
+    pub async fn play(&mut self, source: &Rc<RefCell<Track>>) -> Result<(), Box<dyn std::error::Error>> {
+	    println!("Should start to play with {:?}", source);
 		self.global_state.borrow_mut().index_playing_reset();
 	    self.controls.pause = false;
 
 	    // Stop whatever's currently playing, if anything.
 		// Play shouldn't check if it should play, it should just play.
 		// The logic to check if something should play should be checked whatever is calling play().
-	    if let Some(handle) = self.handle.as_mut() {
+	    if let Some(handle) = self.handle.lock().unwrap().as_mut() {
 	        handle.stop(Tween::default());
 	    }
 
@@ -89,19 +115,19 @@ impl MediaPlayer {
 		let volume = normalize_volume(self.global_state.borrow().volume, 0.0, 100.0, -60.0, 0.0); // Was -20.0
 	    handle.set_volume(kira::Decibels(volume), Tween::default());
 
-	    self.handle = Some(handle);
+	    self.handle = Arc::from(Mutex::from(Some(handle)));
 	    Ok(())
     }
 
     pub fn unpause(&mut self) {
-        if let Some(handle) = self.handle.as_mut() {
+        if let Some(handle) = self.handle.lock().unwrap().as_mut() {
             self.controls.pause = false;
             handle.resume(Tween::default());
         }
     }
 
     pub fn pause(&mut self) {
-        if let Some(handle) = self.handle.as_mut() {
+        if let Some(handle) = self.handle.lock().unwrap().as_mut() {
             self.controls.pause = true;
             handle.pause(Tween::default());
         }
@@ -130,7 +156,7 @@ impl MediaPlayer {
     }
 
     pub fn stop(&mut self) {
-        if let Some(handle) = self.handle.as_mut() {
+        if let Some(handle) = self.handle.lock().unwrap().as_mut() {
             handle.stop(Tween::default());
         }
     }
@@ -145,7 +171,7 @@ impl MediaPlayer {
         self.currently = None;
         self.controls.position = Mutex::new(Duration::new(0, 0));
         self.manager = None;
-        self.handle = None;
+        self.handle = Arc::from(Mutex::from(None));
     }
 
     pub fn volume(&self) -> f32 {
@@ -153,7 +179,7 @@ impl MediaPlayer {
     }
 
     pub fn set_volume(&mut self, value: f32) {
-    	if let Some(handle) = self.handle.as_mut() {
+    	if let Some(handle) = self.handle.lock().unwrap().as_mut() {
      		let volume = normalize_volume(value, 0.0, 100.0, -60.0, 10.0);
     		handle.set_volume(kira::Decibels(volume), Tween::default());
      	}
@@ -198,19 +224,19 @@ impl MediaPlayer {
     // }
 
     pub fn try_seek(&mut self, position: f64) {
-        if let Some(handle) = self.handle.as_mut() {
+        if let Some(handle) = self.handle.lock().unwrap().as_mut() {
             handle.seek_to(position);
         }
     }
 
     pub fn try_seek_by(&mut self, amount: f64) {
-        if let Some(handle) = self.handle.as_mut() {
+        if let Some(handle) = self.handle.lock().unwrap().as_mut() {
             handle.seek_by(amount);
         }
     }
 
     pub fn get_position(&mut self) -> f64 {
-        if let Some(handle) = self.handle.as_mut() {
+        if let Some(handle) = self.handle.lock().unwrap().as_mut() {
             return handle.position();
         }
 

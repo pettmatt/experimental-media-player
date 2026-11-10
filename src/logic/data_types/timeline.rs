@@ -11,7 +11,7 @@ pub struct Timeline {
 }
 
 impl Timeline {
-	pub fn set_timeline(&mut self, track: Rc<RefCell<Track>>, globals: SlintState) {
+	pub fn set_timeline(&mut self, track: &Rc<RefCell<Track>>, globals: &SlintState) {
         self.length = track.borrow().duration;
         self.current = 0;
         self.media_index = Some(track.borrow().id as usize);
@@ -19,7 +19,7 @@ impl Timeline {
         globals.set_timeline(timeline);
     }
 
-    pub fn update_timeline(&mut self, value: i32, globals: SlintState) {
+    pub fn update_timeline(&mut self, value: i32, globals: &SlintState) {
         self.current = value;
         let timeline: SlintTimeline = self.to_slint(None);
         globals.set_timeline(timeline);

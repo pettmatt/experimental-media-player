@@ -1,5 +1,6 @@
 use super::{audio::media_player::MediaPlayer, source};
 use crate::logic::data_types::artist::Artist;
+use crate::logic::data_types::event_context::EventContext;
 use crate::logic::data_types::playlist::Playlist;
 use crate::logic::data_types::queue_item::QueueItem;
 use crate::logic::data_types::setting::Setting;
@@ -15,7 +16,14 @@ use std::{cell::RefCell, rc::Rc};
 
 // Todo: restructure the whole file and stream line it. Too messy to work with after a while.
 
-pub fn handle_initialization(state: &mut State) {
+pub fn setup(app: &AppWindow, state: &Rc<RefCell<State>>, rt: &tokio::runtime::Runtime) {
+    handle_initialization(&mut state.borrow_mut());
+    println!("Playlists: {:?}", &state.borrow().playlists);
+    handle_passing_values(app, &mut state.borrow_mut());
+    handle_events(app, state, rt);
+}
+
+fn handle_initialization(state: &mut State) {
     // Initialize database or restore previous session
     if database::initialize_tables().is_ok() {
         println!("Database initialized");
@@ -78,7 +86,7 @@ pub fn handle_initialization(state: &mut State) {
     }
 }
 
-pub fn handle_passing_values(app: &AppWindow, state: &mut State) {
+fn handle_passing_values(app: &AppWindow, state: &mut State) {
     let global_state = app.global::<SlintState>();
     state.set_index(Some(state.index.clone()), &global_state);
     state.set_queue(Some(state.queue.clone()), &global_state);
@@ -86,60 +94,55 @@ pub fn handle_passing_values(app: &AppWindow, state: &mut State) {
     state.set_volume(&global_state);
 }
 
-pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runtime: &tokio::runtime::Runtime) {
-    let player = Rc::new(RefCell::new(MediaPlayer::new(state.clone())));
+fn handle_events(app: &AppWindow, state: &Rc<RefCell<State>>, _tokio_runtime: &tokio::runtime::Runtime) {
     let global_media_actions = app.global::<MediaActions>();
     let global_setting_actions = app.global::<SettingActions>();
     let global_search_actions = app.global::<SearchActions>();
     let global_context_menu_actions = app.global::<ContextMenuActions>();
-    let weak_app = app.as_weak();
+    let context = EventContext {
+    	app: app.as_weak(),
+     	state: state.clone(),
+      	player: Rc::new(RefCell::new(MediaPlayer::new(state.clone())))
+    };
 
     // Media elements bottom panel.
     global_media_actions.on_media_start({
-       	let app_clone = weak_app.clone();
-        let state_clone = Rc::clone(state);
-        let player_clone = Rc::clone(&player);
-       	let index_clone = state_clone.borrow().index.clone(); // TODO: Might be stale. Snapshot is stale if it's unable to play freshly added tracks. (not confirmed)
+       	let context = context.clone();
 
         move |id: i32| {
             println!("Media start triggered! On track id : {}", &id);
-         	state_clone.borrow_mut().index_playing_reset();
+            context.with_state(|state, _, player| {
+           		state.index_playing_reset();
+            	if let Some((index, track)) = state.index
+	                .iter()
+	                .enumerate()
+	                .find(|(_, item)| item.borrow().id == id) {
+		             	track.borrow_mut().playing = true;
 
-            if let Some((index, track)) = index_clone
-                .iter()
-                .enumerate()
-                .find(|(_, item)| item.borrow().id == id)
-            {
-            	track.borrow_mut().playing = true;
-                let player_temp_clone = player_clone.clone();
-                let track_temp_clone = track.clone();
-                let track_for_timeline = track.clone();
-                let app_timeline_clone = app_clone.clone();
-                let state_timeline_clone = state_clone.clone();
+						let c = context.clone();
+						let p = player.clone();
+						let t = track.clone();
 
-                slint::spawn_local(async move {
-                    audio_control_events::handle_media_start(player_temp_clone, track_temp_clone)
-                        .await;
-      		        if let Some(app) = app_timeline_clone.upgrade() {
-             			let global_state = app.global::<SlintState>();
-						state_timeline_clone.borrow_mut().timeline.set_timeline(track_for_timeline.clone(), global_state);
+			            slint::spawn_local(async move {
+			                audio_control_events::handle_media_start(p, t.clone())
+			                    .await;
+							c.with_state(|s, a, _| {
+								s.timeline.set_timeline(&t, a);
+							});
+			            })
+						.ok();
+
+		                state.timeline.media_index = Some(index);
+		                let temp_queue = state.queue.clone();
+		                if let Some((queue_index, _)) = temp_queue
+		                    .iter()
+		                    .enumerate()
+		                    .find(|(_, queue_item)| queue_item.track_id == track.borrow().id)
+		                {
+		                    state.timeline.queue_index = Some(queue_index);
+		                }
 			        }
-                })
-                .unwrap();
-
-                if let Some(app) = app_clone.upgrade() {
-                	state_clone.borrow_mut().set_current_track(&app.global::<SlintState>());
-                    state_clone.borrow_mut().timeline.media_index = Some(index);
-                    let temp_queue = state_clone.borrow().queue.clone();
-                    if let Some((queue_index, _)) = temp_queue
-                        .iter()
-                        .enumerate()
-                        .find(|(_, queue_item)| queue_item.track_id == track.borrow().id)
-                    {
-                        state_clone.borrow_mut().timeline.queue_index = Some(queue_index);
-                    }
-                }
-            }
+            });
         }
     });
     // TODO: Rewrite
@@ -176,107 +179,99 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
     //     }
     // });
     global_media_actions.on_media_pause({
-        let player_clone = Rc::clone(&player);
+        let context = context.clone();
 
         move || {
-	       	if !player_clone.borrow().is_paused() {
-        		player_clone.borrow_mut().pause();
-        	}
+        	context.with_state(|_, _, player| {
+		       	if !player.is_paused() {
+	        		player.pause();
+	        	}
+         	});
         }
     });
     global_media_actions.on_media_toggle({
-        let player_clone = Rc::clone(&player);
+        let context = context.clone();
 
         move || {
-	        if player_clone.borrow().is_paused() {
-	            player_clone.borrow_mut().unpause();
-	        } else {
-	            player_clone.borrow_mut().pause();
-	        }
+        	context.with_state(|_, _, player| {
+		       	if !player.is_paused() {
+	        		player.unpause();
+	        	} else {
+					player.pause();
+				}
+        	});
         }
     });
     global_media_actions.on_media_change_volume({
-        let player_clone = Rc::clone(&player);
-        let state_clone = Rc::clone(state);
+    	let context = context.clone();
 
         move |volume: f32| {
-	        state_clone.borrow_mut().volume = volume.clone();
-	        player_clone.borrow_mut().set_volume(volume);
+        	context.with_state(|state, _, player| {
+	        	state.volume = volume.clone();
+		        player.set_volume(volume);
+         	});
         }
     });
     global_media_actions.on_media_change_track_position({
-        let player_clone = Rc::clone(&player);
+        let context = context.clone();
 
         move |position: i32| {
-            let duration_position = position as f64;
-            player_clone.borrow_mut().try_seek(duration_position);
+        	context.with_state(|_, _, player| {
+            	let duration_position = position as f64;
+            	player.try_seek(duration_position);
+         	});
         }
     });
     global_media_actions.on_media_get_track_position({
-    	let app_clone = weak_app.clone();
-        let state_clone = Rc::clone(state);
-        let player_clone = Rc::clone(&player);
+   		let context = context.clone();
 
         move || {
-            println!("(Event) Get track triggered");
-        	if let Some(app) = app_clone.upgrade() {
-	            let value = player_clone.borrow_mut().get_position();
-	            let global_state = app.global::<SlintState>();
-	            state_clone
-	                .borrow_mut()
-	                .timeline
-	                .update_timeline(value as i32, global_state);
-         	}
+        	context.with_state(|state, app, player| {
+	            println!("(Event) Get track triggered");
+	            let value = player.get_position();
+	            state.timeline.update_timeline(value as i32, app);
+         	});
         }
     });
     global_media_actions.on_media_mix({
-        let state_clone = Rc::clone(state);
-        let player_clone = Rc::clone(&player);
+    	let context = context.clone();
 
         move || {
-            state_clone.borrow_mut().shuffle();
-            if player_clone.borrow().is_rnged() {
-                player_clone.borrow_mut().set_queue_rng(false);
-            } else {
-                player_clone.borrow_mut().set_queue_rng(true);
-            }
+        	context.with_state(|state, _, player| {
+	            state.shuffle();
+	            if player.is_rnged() {
+	                player.set_queue_rng(false);
+	            } else {
+	                player.set_queue_rng(true);
+	            }
+         	});
         }
     });
     global_media_actions.on_add_to_queue({
-        let app_clone = weak_app.clone();
-        let state_clone = Rc::clone(&state);
+    	let context = context.clone();
 
         move |id: i32| {
-        	if let Some(app) = app_clone.upgrade() {
-				// Add logic that uses different add to logic if index is included. It will enable drag & drop.
-				let was_added = state_clone.borrow_mut().add_to_queue(id, true, &app.global::<SlintState>());
-				if !was_added {
-				    // Prompt user with a box if they want to add the track again.
-				    // state.add_to_queue(id, true);
-				} else {
-				    // Do something if necessary to reflect changes on the UI.
-				}
-         	}
+       		context.with_state(|state, global, _| {
+         		state.add_to_queue(id, true, global);
+         	});
         }
     });
     global_media_actions.on_add_to_playlist({
-        let app_clone = weak_app.clone();
-        let state_clone = Rc::clone(state);
+    	let context = context.clone();
 
         move |playlist_id: i32, track_id: i32| {
-            if let Some(app) = app_clone.upgrade() {
-                state_clone.borrow_mut().add_to_playlist(
+            context.with_state(|state, app, _| {
+                state.add_to_playlist(
                     playlist_id,
                     track_id,
-                    &app.global::<SlintState>(),
+                    app,
                 );
-            }
+            });
         }
     });
 
     global_setting_actions.on_new_local_source({
-        let state_clone = Rc::clone(state);
-        let app_clone = weak_app.clone();
+    	let context = context.clone();
 
         move || {
             let source: Option<std::path::PathBuf> = source::new_local_source();
@@ -302,11 +297,10 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
 
                     let records = source::read_source(source).expect("Couldn't fetch all files");
                     if database::add_records(records.clone()).is_ok() {
-                        state_clone.borrow_mut().merge_to_index(records);
-                        if let Some(app) = app_clone.upgrade() {
-                            let global_state = app.global::<SlintState>();
-                            state_clone.borrow_mut().set_index(None, &global_state);
-                        }
+                    	context.with_state(|state, app, _| {
+                        	state.merge_to_index(records);
+                            state.set_index(None, app);
+                     	});
                     };
                 }
                 None => println!("Didn't receive a path. Result should be None: {:?}", source),
@@ -315,91 +309,83 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
     });
 
     global_search_actions.on_view_change({
-   		let state_clone = Rc::clone(state);
-		let app_clone = weak_app.clone();
+    	let context = context.clone();
 
 		move |main_view: MainView, unique_key: i32| {
-			if let Some(app) = app_clone.upgrade() {
-				let global_state = app.global::<SlintState>();
+			context.with_state(|state, app, _| {
 				let value = crate::SlintSelected {
 		     		main_view: main_view,
 		       		selected_id: unique_key,
 		     	};
 
-				state_clone.borrow_mut().set_main_view(value, &global_state);
-			}
+				state.set_main_view(value, app);
+			});
 		}
     });
 
     global_search_actions.on_view_change_generic({
-   		let state_clone = Rc::clone(state);
-		let app_clone = weak_app.clone();
+  		let context = context.clone();
 
 		move |main_view: MainView| {
-			if let Some(app) = app_clone.upgrade() {
-				let global_state = app.global::<SlintState>();
+			context.with_state(|state, app, _| {
 				let value = crate::SlintSelected {
-		     		main_view: main_view,
+					main_view: main_view,
 					// To indicate that the view was changed with intention
-		       		selected_id: -2,
-		     	};
+			  		selected_id: -2,
+				};
 
-				state_clone.borrow_mut().set_main_view(value, &global_state);
-			}
+				state.set_main_view(value, app);
+			});
 		}
     });
 
 	// TODO: make sure the search_term is valid (shouldn't be trusted)
     global_search_actions.on_search_local({
-	    let state_clone = Rc::clone(state);
-		let app_clone = weak_app.clone();
+    	let context = context.clone();
 
 		// TODO: Extemely simple search result that probably is too slow for large indexes.
 		// TODO: Tags should a hash map.
-	    move |search_term: slint::SharedString, tags: slint::ModelRc<slint::SharedString>| {
-			let s_term = search_term.to_ascii_lowercase();
-			let mut found_artists: Vec<String> = Vec::new();
-			let tracks: Vec<Track> = state_clone.borrow().index
-				.iter()
-				.filter(|track| {
-					let t = track.borrow();
-					let found = t.artist.to_ascii_lowercase().contains(&s_term);
-					if found && !found_artists.contains(&s_term) {
-						found_artists.push(track.borrow().artist.clone())
-					}
-					found && !found_artists.contains(&s_term)
-				})
-				.map(|track| track.borrow().clone())
-				.collect();
-
-			let mut artists: Vec<Artist> = Vec::new();
-			if let Ok(list) = database::get_table::<Artist>() {
-				artists = list
+	    move |search_term: slint::SharedString, _tags: slint::ModelRc<slint::SharedString>| {
+			context.with_state(|state, app, _| {
+				let s_term = search_term.to_ascii_lowercase();
+				let mut found_artists: Vec<String> = Vec::new();
+				let tracks: Vec<Track> = state.index
 					.iter()
-					.cloned()
-					.filter(|artist| found_artists.contains(&artist.name)).collect();
-			};
+					.filter(|track| {
+						let t = track.borrow();
+						let found = t.artist.to_ascii_lowercase().contains(&s_term);
+						if found && !found_artists.contains(&s_term) {
+							found_artists.push(track.borrow().artist.clone())
+						}
+						found && !found_artists.contains(&s_term)
+					})
+					.map(|track| track.borrow().clone())
+					.collect();
 
-			let playlists: Vec<Playlist> = state_clone.borrow().playlists
-				.iter()
-				.filter(|p| {
-					let found = p.name.to_ascii_lowercase().contains(&s_term);
-					found
-				})
-				.map(|p| p.clone())
-				.collect();
+				let mut artists: Vec<Artist> = Vec::new();
+				if let Ok(list) = database::get_table::<Artist>() {
+					artists = list
+						.iter()
+						.cloned()
+						.filter(|artist| found_artists.contains(&artist.name))
+						.collect();
+				};
 
-			let results = SearchResults {
-				tracks,
-				artists,
-				playlists: playlists,
-			};
+				let playlists: Vec<Playlist> = state.playlists
+					.iter()
+					.filter(|p| p.name.to_ascii_lowercase().contains(&s_term))
+					.map(|p| p.clone())
+					.collect();
 
-			if let Some(app) = app_clone.upgrade() {
-				let global_state = app.global::<SlintState>();
-	        	state_clone.borrow_mut().set_search_results(results, &global_state);
-				println!("State search results changed: {:?}", state_clone.borrow().search_result);
-			}
+				let results = SearchResults {
+					tracks,
+					artists,
+					playlists: playlists,
+				};
+
+	        	state.set_search_results(results, app);
+				println!("State search results changed: {:?}", state.search_result);
+			});
 	    }
     });
 
@@ -440,8 +426,7 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
 
     global_context_menu_actions.on_create_new_playlist({
         use crate::Playlist;
-        let app_clone = weak_app.clone();
-        let state_clone = Rc::clone(state);
+        let context = context.clone();
 
         move || {
             let playlists = database::get_table::<Playlist>();
@@ -465,76 +450,71 @@ pub fn handle_events(app: &AppWindow, state: &mut Rc<RefCell<State>>, tokio_runt
             };
 
             if database::add_record(new_entry.clone()).is_ok() {
-                state_clone.borrow_mut().playlists.push(new_entry);
-                if let Some(app) = app_clone.upgrade() {
-                    let global_state = app.global::<SlintState>();
-                    state_clone.borrow_mut().set_playlist(&global_state);
-                }
+            	context.with_state(|state, app, _| {
+	                state.playlists.push(new_entry);
+                    state.set_playlist(app);
+             	});
             };
         }
     });
 }
 
 pub mod audio_control_events {
-    use crate::{
+	use crate::{
         logic::{audio::media_player::MediaPlayer, data_types::track::Track}
     };
-    use std::{cell::RefCell, rc::Rc};
+    use std::{cell::RefCell, rc::Rc, sync::{Arc, Mutex}};
 
-    pub async fn handle_media_start(media_player: Rc<RefCell<MediaPlayer>>, track: Rc<RefCell<Track>>) {
+    pub async fn handle_media_start(mut player: MediaPlayer, track: Rc<RefCell<Track>>) {
     	slint::spawn_local(async move {
-	        let _ = media_player.borrow_mut().play(track).await;
-	        let watch_p = media_player.clone();
-	        let timer = watch_track_ending(watch_p, media_player.borrow().generation,
-	       	);
-	        media_player.clone().borrow_mut().end_timer = Some(timer);
+     		let generation = player.generation;
+	        let _ = player.play(&track).await;
+	        let timer = watch_track_ending(player.clone(), generation);
+			handle_media_change(player.clone(), (0, 0));
+	        player.end_timer = Arc::from(Mutex::from(Some(timer)));
 		}).unwrap();
     }
 
-    fn watch_track_ending(media_player: Rc<RefCell<MediaPlayer>>, generation: u64) -> slint::Timer {
+    fn watch_track_ending(player: MediaPlayer, generation: u64) -> slint::Timer {
         let timer = slint::Timer::default();
-        let timer_p = media_player.clone();
 
         timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(250), move || {
-            let p = timer_p.borrow();
-            if p.generation != generation {
+            if player.generation != generation {
                 return;
             }
 
-            let finished = match p.handle.as_ref() {
+            let finished = match player.handle.lock().unwrap().as_ref() {
                 Some(handle) => matches!(handle.state(), kira::sound::PlaybackState::Stopped),
                 None => true,
             };
 
             if finished {
                 println!("Track finished");
-                drop(p);
-                handle_media_change(media_player.clone(), (0, 0));
             }
         });
 
         timer
     }
 
-    pub fn handle_media_change(media_player: Rc<RefCell<MediaPlayer>>, (previous_index, current_index): (usize, usize)) {
+    pub fn handle_media_change(mut player: MediaPlayer, (previous_index, current_index): (usize, usize)) {
         // If the queue moved only by one, skip to next track
        	slint::spawn_local(async move {
 	        let difference = previous_index.saturating_sub(current_index);
 	        if difference == 1 || difference == usize::MIN {
-	            if let Ok(Some(track)) = media_player.borrow_mut().next() {
-            		handle_media_start(media_player.clone(), track).await
+	            if let Ok(Some(track)) = player.next() {
+            		handle_media_start(player, track).await
 	            }
 	        }
        	}).unwrap();
         // Else the queue needs to be remade within the media player, if the queue is loopable.
     }
 
-    pub fn handle_media_loop(media_player: &mut Rc<RefCell<MediaPlayer>>) {
+    pub fn handle_media_loop(player: &mut Rc<RefCell<MediaPlayer>>) {
         println!("create_loop action triggered");
-        if media_player.borrow().is_looped() {
-            media_player.borrow_mut().set_queue_loop(false);
+        if player.borrow().is_looped() {
+            player.borrow_mut().set_queue_loop(false);
         } else {
-            media_player.borrow_mut().set_queue_loop(true);
+            player.borrow_mut().set_queue_loop(true);
         }
     }
 }
