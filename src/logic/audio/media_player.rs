@@ -4,15 +4,14 @@ use crate::State;
 use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 use kira::sound::FromFileError;
 use kira::{AudioManager, AudioManagerSettings, DefaultBackend, Tween};
-use std::cell::RefCell;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::rc::Rc;
+use std::cell::RefCell;
+use std::hash::{DefaultHasher, Hash};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 pub struct MediaPlayer {
 	pub global_state: Rc<RefCell<State>>,
-	pub generation: u64,
     pub currently: Option<Rc<RefCell<Track>>>,
     controls: Controls,
     manager: Option<AudioManager<DefaultBackend>>,
@@ -34,32 +33,6 @@ pub struct Controls {
 // TODO: Add a logic that puts tracks from queue to "trash"-queue.
 // TODO: Add a logic picks random track (would use trash-queue to prevent to pick previous tracks).
 
-impl Clone for MediaPlayer {
-	fn clone(&self) -> Self {
-		let volume = self.controls.volume.lock().unwrap().clone();
-		let position = self.controls.position.lock().unwrap().clone();
-		let length = self.controls.length.lock().unwrap().clone();
-
-		Self {
-  			global_state: self.global_state.clone(),
-            currently: self.currently.clone(),
-            manager: None,
-            handle: self.handle.clone(),
-            controls: Controls {
-                loop_pick: self.controls.loop_pick,
-                rng_pick: self.controls.rng_pick,
-                pause: self.controls.pause,
-                stopped: self.controls.stopped,
-                volume: Mutex::from(volume),
-                position: Mutex::from(position),
-                length: Mutex::from(length),
-            },
-       		generation: self.generation,
-        	end_timer: self.end_timer.clone(),
-		}
-	}
-}
-
 impl MediaPlayer {
     pub fn new(state: Rc<RefCell<State>>) -> Self {
     	let mut hasher = DefaultHasher::new();
@@ -78,7 +51,6 @@ impl MediaPlayer {
                 position: Mutex::new(Duration::new(0, 0)),
                 length: Mutex::new(Duration::new(0, 0)),
             },
-       		generation: hasher.finish(),
          	end_timer: Arc::new(Mutex::new(None))
         }
     }
@@ -115,7 +87,7 @@ impl MediaPlayer {
 		let volume = normalize_volume(self.global_state.borrow().volume, 0.0, 100.0, -60.0, 0.0); // Was -20.0
 	    handle.set_volume(kira::Decibels(volume), Tween::default());
 
-	    self.handle = Arc::from(Mutex::from(Some(handle)));
+	    *self.handle.lock().unwrap() = Some(handle);
 	    Ok(())
     }
 
@@ -171,7 +143,7 @@ impl MediaPlayer {
         self.currently = None;
         self.controls.position = Mutex::new(Duration::new(0, 0));
         self.manager = None;
-        self.handle = Arc::from(Mutex::from(None));
+        *self.handle.lock().unwrap() = None;
     }
 
     pub fn volume(&self) -> f32 {

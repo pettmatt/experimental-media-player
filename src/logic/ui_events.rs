@@ -183,8 +183,8 @@ fn handle_events(app: &AppWindow, state: &Rc<RefCell<State>>, _tokio_runtime: &t
 
         move || {
         	context.with_state(|_, _, player| {
-		       	if !player.is_paused() {
-	        		player.pause();
+		       	if !player.borrow().is_paused() {
+	        		player.borrow_mut().pause();
 	        	}
          	});
         }
@@ -194,10 +194,10 @@ fn handle_events(app: &AppWindow, state: &Rc<RefCell<State>>, _tokio_runtime: &t
 
         move || {
         	context.with_state(|_, _, player| {
-		       	if !player.is_paused() {
-	        		player.unpause();
+		       	if !player.borrow().is_paused() {
+	        		player.borrow_mut().unpause();
 	        	} else {
-					player.pause();
+					player.borrow_mut().pause();
 				}
         	});
         }
@@ -208,7 +208,7 @@ fn handle_events(app: &AppWindow, state: &Rc<RefCell<State>>, _tokio_runtime: &t
         move |volume: f32| {
         	context.with_state(|state, _, player| {
 	        	state.volume = volume.clone();
-		        player.set_volume(volume);
+		        player.borrow_mut().set_volume(volume);
          	});
         }
     });
@@ -218,7 +218,7 @@ fn handle_events(app: &AppWindow, state: &Rc<RefCell<State>>, _tokio_runtime: &t
         move |position: i32| {
         	context.with_state(|_, _, player| {
             	let duration_position = position as f64;
-            	player.try_seek(duration_position);
+            	player.borrow_mut().try_seek(duration_position);
          	});
         }
     });
@@ -228,7 +228,7 @@ fn handle_events(app: &AppWindow, state: &Rc<RefCell<State>>, _tokio_runtime: &t
         move || {
         	context.with_state(|state, app, player| {
 	            println!("(Event) Get track triggered");
-	            let value = player.get_position();
+	            let value = player.borrow_mut().get_position();
 	            state.timeline.update_timeline(value as i32, app);
          	});
         }
@@ -239,10 +239,10 @@ fn handle_events(app: &AppWindow, state: &Rc<RefCell<State>>, _tokio_runtime: &t
         move || {
         	context.with_state(|state, _, player| {
 	            state.shuffle();
-	            if player.is_rnged() {
-	                player.set_queue_rng(false);
+	            if player.borrow().is_rnged() {
+	                player.borrow_mut().set_queue_rng(false);
 	            } else {
-	                player.set_queue_rng(true);
+	                player.borrow_mut().set_queue_rng(true);
 	            }
          	});
         }
@@ -460,56 +460,46 @@ fn handle_events(app: &AppWindow, state: &Rc<RefCell<State>>, _tokio_runtime: &t
 }
 
 pub mod audio_control_events {
-	use crate::{
-        logic::{audio::media_player::MediaPlayer, data_types::track::Track}
-    };
-    use std::{cell::RefCell, rc::Rc, sync::{Arc, Mutex}};
+	use crate::{logic::{audio::media_player::MediaPlayer, data_types::track::Track}};
+    use std::{cell::RefCell, rc::Rc};
 
-    pub async fn handle_media_start(mut player: MediaPlayer, track: Rc<RefCell<Track>>) {
-    	slint::spawn_local(async move {
-     		let generation = player.generation;
-	        let _ = player.play(&track).await;
-	        let timer = watch_track_ending(player.clone(), generation);
-			handle_media_change(player.clone(), (0, 0));
-	        player.end_timer = Arc::from(Mutex::from(Some(timer)));
-		}).unwrap();
+    pub async fn handle_media_start(player: Rc<RefCell<MediaPlayer>>, track: Rc<RefCell<Track>>) {
+        let _ = player.borrow_mut().play(&track).await;
+        let timer = watch_track_ending(player.clone());
+       	*player.borrow_mut().end_timer.lock().unwrap() = Some(timer);
     }
 
-    fn watch_track_ending(player: MediaPlayer, generation: u64) -> slint::Timer {
+    fn watch_track_ending(player: Rc<RefCell<MediaPlayer>>) -> slint::Timer {
         let timer = slint::Timer::default();
 
         timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(250), move || {
-            if player.generation != generation {
-                return;
-            }
-
-            let finished = match player.handle.lock().unwrap().as_ref() {
+            let finished = match player.borrow().handle.lock().unwrap().as_ref() {
                 Some(handle) => matches!(handle.state(), kira::sound::PlaybackState::Stopped),
                 None => true,
             };
 
             if finished {
                 println!("Track finished");
+                handle_media_change(player.clone(), (0, 0));
             }
         });
 
         timer
     }
 
-    pub fn handle_media_change(mut player: MediaPlayer, (previous_index, current_index): (usize, usize)) {
+    pub fn handle_media_change(player: Rc<RefCell<MediaPlayer>>, (previous_index, current_index): (usize, usize)) {
         // If the queue moved only by one, skip to next track
        	slint::spawn_local(async move {
-	        let difference = previous_index.saturating_sub(current_index);
-	        if difference == 1 || difference == usize::MIN {
-	            if let Ok(Some(track)) = player.next() {
-            		handle_media_start(player, track).await
+	        if current_index == previous_index + 1 {
+	            if let Ok(Some(track)) = player.borrow_mut().next() {
+            		handle_media_start(player.clone(), track).await
 	            }
 	        }
        	}).unwrap();
         // Else the queue needs to be remade within the media player, if the queue is loopable.
     }
 
-    pub fn handle_media_loop(player: &mut Rc<RefCell<MediaPlayer>>) {
+    pub fn handle_media_loop(player: Rc<RefCell<MediaPlayer>>) {
         println!("create_loop action triggered");
         if player.borrow().is_looped() {
             player.borrow_mut().set_queue_loop(false);

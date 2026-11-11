@@ -9,15 +9,28 @@ mod logic;
 
 slint::include_modules!();
 
+struct App {
+    window: AppWindow,
+    state: Rc<RefCell<State>>,
+    runtime: tokio::runtime::Runtime, // Remove if not used, currently planned to be used in online sesarch feature in ui_events file
+}
+
+impl App {
+    fn new() -> Result<Self, Box<dyn Error>> {
+        let window = AppWindow::new()?;
+        let state = Rc::new(RefCell::new(State::default()));
+        let runtime = tokio::runtime::Runtime::new()?;
+
+        ui::setup(&window, &state, &runtime);
+        Ok(Self { window, state, runtime })
+    }
+
+    fn run(self) -> Result<(), Box<dyn Error>> {
+        self.window.run()?;
+        Ok(())
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
-    let app = AppWindow::new()?;
-    let mut state = State::default();
-    let tokio_runtime = tokio::runtime::Runtime::new()?;
-
-    ui::handle_initialization(&mut state);
-    ui::handle_passing_values(&app, &mut state);
-    ui::handle_events(&app, &mut Rc::new(RefCell::new(state)), &tokio_runtime);
-    app.run()?;
-
-    Ok(())
+	App::new()?.run()
 }
